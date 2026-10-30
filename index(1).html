@@ -1,0 +1,1325 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Грань 3D</title>
+<meta name="description" content="Многогранники и тела вращения в 3D: вращение, элементы, площадь поверхности, развёртки с анимацией сборки и проверкой ошибок.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-screen workbench. A sheet of squared school paper holds the 3D scene (top on phones, left on desktop); the tool panel sits beside or below it. */
+:root{
+  --paper:#edf1f7; --surface:#ffffff; --surface-2:#f4f6fa; --ink:#131b31; --ink-2:#56607a; --ink-3:#8a93a8;
+  --line:#d5dbe7; --grid:rgba(38,74,160,.10); --grid-strong:rgba(38,74,160,.18);
+  --accent:#1d4ed8; --accent-soft:#e3eaff; --accent-ink:#ffffff;
+  --mark:#e89a00; --err:#d1263f; --err-soft:#fde7ea; --ok:#13804f; --ok-soft:#e1f4ea;
+  --face-base:#86a8ff; --face-side:#c3d3ff; --face-top:#a9c0ff; --edge:#131b31; --edge-hidden:#5f6c8a;
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e1320; --surface:#151c2c; --surface-2:#1b2336; --ink:#e8edf8; --ink-2:#a3adc4; --ink-3:#6f7a93;
+    --line:#2a3349; --grid:rgba(140,170,255,.07); --grid-strong:rgba(140,170,255,.13);
+    --accent:#7ea2ff; --accent-soft:#1f2c50; --accent-ink:#0b1020;
+    --mark:#ffb627; --err:#ff5c72; --err-soft:#3a1822; --ok:#4bd18f; --ok-soft:#14301f;
+    --face-base:#3f63c4; --face-side:#2a3f78; --face-top:#3552a0; --edge:#e8edf8; --edge-hidden:#8d9ab8;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e1320; --surface:#151c2c; --surface-2:#1b2336; --ink:#e8edf8; --ink-2:#a3adc4; --ink-3:#6f7a93;
+  --line:#2a3349; --grid:rgba(140,170,255,.07); --grid-strong:rgba(140,170,255,.13);
+  --accent:#7ea2ff; --accent-soft:#1f2c50; --accent-ink:#0b1020;
+  --mark:#ffb627; --err:#ff5c72; --err-soft:#3a1822; --ok:#4bd18f; --ok-soft:#14301f;
+  --face-base:#3f63c4; --face-side:#2a3f78; --face-top:#3552a0; --edge:#e8edf8; --edge-hidden:#8d9ab8;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html{box-sizing:border-box;height:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{height:100%;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line);flex:none}
+.brand{display:flex;align-items:center;gap:8px;flex:none}
+.brand svg{width:28px;height:28px;display:block}
+.brand b{font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.01em}
+.tabs{display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{border:0;background:transparent;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.tab .ts{display:none}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.lang{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.lang button{border:0;background:transparent;padding:6px 9px;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--ink-2)}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+
+.stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+.view{position:relative;min-width:0;min-height:0;overflow:hidden;
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid-strong) 1px,transparent 1px),linear-gradient(90deg,var(--grid-strong) 1px,transparent 1px),linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px}
+.view canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;outline:none}
+.overlay{position:absolute;inset:0;pointer-events:none}
+.lbl{position:absolute;left:0;top:0;font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--ink);transform:translate(-50%,-50%);white-space:nowrap;text-shadow:0 0 3px var(--paper),0 0 3px var(--paper),0 0 2px var(--paper);will-change:transform;transition:opacity .15s}
+.lbl.small{font-size:11px;color:var(--ink-2)}
+.lbl.el{font-family:var(--f-body);font-size:12px;font-weight:700;background:var(--mark);color:#1b1300;padding:2px 7px;border-radius:6px;text-shadow:none}
+.lbl.pt{color:var(--mark)}
+.hbtn{position:absolute;left:0;top:0;pointer-events:auto;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:2px solid var(--accent);background:var(--surface);color:var(--accent);font-size:19px;font-weight:700;line-height:24px;padding:0;box-shadow:0 2px 6px rgba(0,0,0,.15);will-change:transform}
+.hbtn.del{border-color:var(--err);color:var(--err);width:24px;height:24px;margin:-12px 0 0 -12px;font-size:15px;line-height:19px}
+.hbtn:active{transform:scale(.92)}
+
+.vtools{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.vbtn{min-width:40px;height:36px;padding:0 8px;border:1px solid var(--line);background:var(--surface);border-radius:9px;font-size:12px;font-weight:600;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.vbtn[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.vbtn svg{width:18px;height:18px}
+.vgap{height:4px}
+.vtitle{position:absolute;left:max(12px,env(safe-area-inset-left,0px));top:10px;z-index:3;pointer-events:none}
+.vtitle .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);font-weight:600}
+.vtitle .n{font-family:var(--f-display);font-weight:700;font-size:18px;line-height:1.2}
+.hint{position:absolute;left:max(12px,env(safe-area-inset-left,0px));top:64px;background:var(--ink);color:var(--surface);font-size:12.5px;padding:7px 11px;border-radius:10px;max-width:min(420px,calc(100% - 100px));z-index:2;transition:opacity .5s;pointer-events:none}
+.hint.gone{opacity:0}
+
+.vbottom{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 max(10px,env(safe-area-inset-right,0px)) 10px max(10px,env(safe-area-inset-left,0px));z-index:3;pointer-events:none}
+.vbottom > *{pointer-events:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(10,20,50,.12)}
+.info{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;max-width:min(520px,100%);font-size:14px}
+.info .sw{width:12px;height:12px;border-radius:3px;background:var(--mark);margin-top:4px;flex:none}
+.info b{display:block;font-weight:700}
+.info span{color:var(--ink-2)}
+.info .x{margin-left:auto;border:0;background:transparent;font-size:20px;line-height:1;color:var(--ink-3);padding:0 2px}
+.fold{display:flex;align-items:center;gap:10px;padding:8px 10px;width:min(560px,100%)}
+.play{flex:none;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;border-radius:9px;padding:9px 14px;font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.fold input{flex:1;min-width:0;accent-color:var(--accent)}
+.fold .ends{font-size:11px;color:var(--ink-2);display:flex;flex-direction:column;line-height:1.2;text-align:right;flex:none}
+.quiz{padding:12px 14px;width:min(460px,100%);display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.quiz p{margin:0;font-weight:600}
+.quiz .row{display:flex;gap:8px}
+.quiz .row button{flex:1}
+.res{padding:2px 0 0;font-size:14px}
+.res.good{color:var(--ok)} .res.bad{color:var(--err)}
+
+.panel{min-width:0;min-height:0;overflow-y:auto;background:var(--surface);border-left:1px solid var(--line);padding-block:6px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sec{padding:14px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.sec:last-child{border-bottom:0}
+.sec h2{margin:0;font-family:var(--f-display);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)}
+.sub{font-size:12px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:6px 12px;font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.chip.mk[aria-pressed="true"]{background:var(--mark);border-color:var(--mark);color:#1b1300}
+.chip .sym{font-family:var(--f-mono);font-size:12px;opacity:.75}
+.param{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.param label{font-size:13.5px;color:var(--ink-2)}
+.param output{font-family:var(--f-mono);font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+.param .row{grid-column:1/-1;display:flex;align-items:center;gap:8px}
+.param input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:28px}
+.step{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);font-size:18px;font-weight:600;line-height:1;padding:0;flex:none}
+.sw-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.switch{appearance:none;width:42px;height:24px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;flex:none;transition:background .15s;margin:0}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.switch:checked{background:var(--accent)}
+.switch:checked::after{transform:translateX(18px)}
+.sheet{font-size:14px;display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.sheet .r{display:grid;grid-template-columns:1fr;gap:2px;padding:9px 12px;border-bottom:1px dashed var(--line)}
+.sheet .r:last-child{border-bottom:0}
+.sheet .r.total{background:var(--accent-soft)}
+.sheet .k{font-size:12.5px;color:var(--ink-2)}
+.sheet .f{font-family:var(--f-mono);font-size:13.5px;overflow-wrap:anywhere}
+.sheet .f b{font-weight:600}
+.sheet sub{font-size:.72em}
+.counts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.counts div{background:var(--surface-2);border-radius:8px;padding:8px 4px}
+.counts b{display:block;font-family:var(--f-mono);font-size:20px}
+.counts span{font-size:12px;color:var(--ink-2)}
+.euler{font-size:13px;color:var(--ink-2);font-family:var(--f-mono)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.checks li{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.checks li.ok{background:var(--ok-soft)}
+.checks li.bad{background:var(--err-soft)}
+.checks li i{font-style:normal;font-weight:800;flex:none;width:16px;text-align:center}
+.checks li.ok i{color:var(--ok)} .checks li.bad i{color:var(--err)} .checks li.wait i{color:var(--ink-3)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:9px 14px;font-weight:600;font-size:14px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:default}
+.note{font-size:13px;color:var(--ink-2);margin:0}
+.legend{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.legend span{display:flex;gap:8px;align-items:center}
+.legend i{width:18px;height:4px;border-radius:2px;flex:none}
+.prog{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.about{font-size:12.5px;color:var(--ink-3)}
+
+.modal{position:fixed;inset:0;background:rgba(8,12,24,.55);z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal .card{width:min(760px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.modal header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.modal header h3{margin:0;font-family:var(--f-display);font-size:15px;flex:1}
+.modal .body{overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.svgbox{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;overflow:auto}
+.svgbox svg{display:block;width:100%;height:auto;max-height:55vh}
+.modal footer{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+.scale{display:flex;align-items:center;gap:8px;font-size:14px}
+.scale input{width:72px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+#printArea{display:none}
+@media print{
+  body{overflow:visible;background:#fff}
+  .app,.modal{display:none!important}
+  #printArea{display:block!important}
+  #printArea svg{display:block}
+  @page{size:A4;margin:10mm}
+}
+
+@media (max-width: 899px){
+  .stage{grid-template-columns:1fr;grid-template-rows:minmax(300px,56%) minmax(0,1fr)}
+  .panel{border-left:0;border-top:1px solid var(--line)}
+  .brand b{display:none}
+}
+@media (max-width: 899px){
+  .vtools [data-z="in"],.vtools [data-z="out"]{display:none}
+  .vbtn{height:32px;min-width:36px;font-size:11.5px}
+  .vtools{gap:5px}
+}
+@media (max-width: 480px){
+  .brand{display:none}
+  .tab .tl{display:none} .tab .ts{display:inline}
+  .top{gap:8px}
+}
+@media (max-width: 420px){
+  .tab{padding:8px 9px;font-size:13px}
+  .vtitle .n{font-size:16px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand" aria-label="Грань 3D">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 10v12L16 29 4 22V10z" fill="var(--face-side)" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M16 3v26M4 10l12 7 12-7" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M16 17 4 10" stroke="var(--mark)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <b>Грань 3D</b>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+    <div class="lang" role="group" aria-label="Язык / Тіл">
+      <button id="lang-ru" data-lang="ru">RU</button><button id="lang-kz" data-lang="kz">ҚАЗ</button>
+    </div>
+  </header>
+  <main class="stage">
+    <div class="view" id="view">
+      <div class="vtitle"><div class="k" id="vMode"></div><div class="n" id="vName"></div></div>
+      <div class="overlay" id="overlay"></div>
+      <div class="vtools" id="vtools"></div>
+      <div class="hint" id="hint"></div>
+      <div class="vbottom" id="vbottom"></div>
+    </div>
+    <aside class="panel" id="panel"></aside>
+  </main>
+</div>
+<div class="modal" id="modal" hidden></div>
+<div id="printArea"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = (s, r=document) => r.querySelector(s);
+const V3 = THREE.Vector3, TAU = Math.PI*2, PI = Math.PI;
+const YUP = new V3(0,1,0);
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const smooth=(a,b,x)=>{x=clamp((x-a)/(b-a),0,1);return x*x*(3-2*x);};
+const ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+function fmt(x){ if(!isFinite(x)) return '—'; let r=Math.round(x*100)/100; if(Object.is(r,-0)) r=0; let s=Number.isInteger(r)?String(r):r.toFixed(2).replace(/0$/,''); return s.replace('.',','); }
+const ls = { get(k){try{return localStorage.getItem(k);}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,v);}catch(e){}} };
+
+/* ================= i18n ================= */
+const D = {
+  tabModel:['3D-модель','3D-модель'], tabNet:['Развёртка','Жазба'], tabBuild:['Конструктор','Құрастырғыш'],
+  modeModel:['Рассматриваем фигуру','Фигураны қарастырамыз'], modeNet:['Развёртка фигуры','Фигураның жазбасы'], modeBuild:['Собери развёртку сам','Жазбаны өзің құрастыр'],
+  shapes:['Фигура','Фигура'], polyGroup:['Многогранники','Көпжақтар'], revGroup:['Тела вращения','Айналу денелері'],
+  cube:['Куб','Куб'], box:['Параллелепипед','Параллелепипед'], prism:['Призма','Призма'], pyramid:['Пирамида','Пирамида'], frustum:['Усечённая пирамида','Қиық пирамида'],
+  tetra:['Тетраэдр','Тетраэдр'], octa:['Октаэдр','Октаэдр'], dodeca:['Додекаэдр','Додекаэдр'], icosa:['Икосаэдр','Икосаэдр'],
+  cylinder:['Цилиндр','Цилиндр'], cone:['Конус','Конус'], fcone:['Усечённый конус','Қиық конус'], sphere:['Шар и сфера','Шар және сфера'],
+  regular:['правильные','дұрыс'],
+  params:['Размеры','Өлшемдері'], cm:['см','см'],
+  pn:['Сторон у основания','Табан қабырғаларының саны'], pa:['Сторона основания','Табан қабырғасы'], pEdge:['Ребро','Қыры'], pa2:['Сторона верхнего основания','Жоғарғы табан қабырғасы'],
+  ph:['Высота','Биіктігі'], pLen:['Длина','Ұзындығы'], pWid:['Ширина','Ені'], pr:['Радиус основания','Табан радиусы'], pR:['Радиус нижнего основания','Төменгі табан радиусы'], pr2:['Радиус верхнего основания','Жоғарғы табан радиусы'], pRs:['Радиус','Радиусы'],
+  elements:['Элементы фигуры','Фигураның элементтері'], elHint:['Нажмите — элемент подсветится на модели. Можно нажимать прямо на грани, рёбра и вершины.','Басыңыз — элемент модельде белгіленеді. Жақтарды, қырларды және төбелерді тікелей басуға болады.'],
+  display:['Вид','Көрініс'], showLabels:['Подписи вершин','Төбе белгілері'], transparent:['Прозрачные грани','Мөлдір жақтар'], autorotate:['Автоповорот','Автоайналу'],
+  area:['Площадь поверхности','Бетінің ауданы'], counts:['Вершины, рёбра, грани','Төбелер, қырлар, жақтар'],
+  cV:['вершин','төбе'], cE:['рёбер','қыр'], cF:['граней','жақ'], euler:['Формула Эйлера: В − Р + Г = 2','Эйлер формуласы: Т − Қ + Ж = 2'], eulerL:['В − Р + Г','Т − Қ + Ж'],
+  sBase:['осн','таб'], sLat:['бок','бүй'], sFull:['полн','тол'],
+  kBase:['Площадь основания','Табан ауданы'], kBase1:['Площадь нижнего основания','Төменгі табан ауданы'], kBase2:['Площадь верхнего основания','Жоғарғы табан ауданы'],
+  kLat:['Площадь боковой поверхности','Бүйір бетінің ауданы'], kFull:['Площадь полной поверхности','Толық бетінің ауданы'],
+  kRin:['Радиус вписанной окружности основания','Табанға іштей сызылған шеңбер радиусы'], kRin1:['Радиусы вписанных окружностей оснований','Табандарға іштей сызылған шеңберлер радиустары'],
+  kApo:['Апофема (высота боковой грани)','Апофема (бүйір жағының биіктігі)'], kGen:['Образующая','Жасаушы'], kDiag:['Диагональ','Диагональ'],
+  // elements
+  eHeight:['Высота','Биіктік'], eHeightLat:['Высота = боковое ребро','Биіктік = бүйір қыры'], eBaseEdge:['Ребро основания','Табан қыры'], eTopEdge:['Ребро верхнего основания','Жоғарғы табан қыры'], eLatEdge:['Боковое ребро','Бүйір қыры'],
+  eBase:['Основание','Табан'], eTop:['Верхнее основание','Жоғарғы табан'], eLatFace:['Боковая грань','Бүйір жағы'], eDiag:['Диагональ','Диагональ'], eBaseDiag:['Диагональ основания','Табан диагоналі'],
+  eFaceDiag:['Диагональ грани','Жақ диагоналі'], eDiagSec:['Диагональное сечение','Диагональдық қима'], eApo:['Апофема','Апофема'], eRin:['Радиус впис. окружности','Іштей сызылған шеңбер радиусы'], eRout:['Радиус опис. окружности','Сырттай сызылған шеңбер радиусы'],
+  eEdge:['Ребро','Қыр'], eFace:['Грань','Жақ'], eVertex:['Вершина','Төбе'], eApex:['Вершина пирамиды','Пирамида төбесі'],
+  eAxis:['Ось','Ось'], eRadius:['Радиус','Радиус'], eRadius2:['Радиус верхнего основания','Жоғарғы табан радиусы'], eDiam:['Диаметр','Диаметр'], eGen:['Образующая','Жасаушы'], eAxSec:['Осевое сечение','Осьтік қима'],
+  eConeApex:['Вершина конуса','Конус төбесі'], eCenter:['Центр','Центр'], eGreat:['Большой круг','Үлкен дөңгелек'], eSection:['Сечение плоскостью','Жазықтықпен қима'], eSurface:['Сфера (поверхность шара)','Сфера (шардың беті)'], eLatSurf:['Боковая поверхность','Бүйір беті'],
+  // face/edge kinds & shapes
+  tri:['треугольник','үшбұрыш'], quad:['четырёхугольник','төртбұрыш'], pent:['пятиугольник','бесбұрыш'], hex:['шестиугольник','алтыбұрыш'], hept:['семиугольник','жетібұрыш'], oct:['восьмиугольник','сегізбұрыш'],
+  regularShape:['правильный','дұрыс'], square:['квадрат','шаршы'], rect:['прямоугольник','тіктөртбұрыш'], isoTri:['равнобедренный треугольник','тең бүйірлі үшбұрыш'], eqTri:['правильный треугольник','дұрыс үшбұрыш'], isoTrap:['равнобедренная трапеция','тең бүйірлі трапеция'], regPent:['правильный пятиугольник','дұрыс бесбұрыш'],
+  length:['длина','ұзындығы'], meet:['сходится рёбер','тоғысатын қырлар'], areaW:['площадь','ауданы'],
+  // net
+  variants:['Вариант развёртки','Жазба нұсқасы'], vBfs:['Классическая','Классикалық'], vStrip:['Лента','Таспа'], vRandom:['Случайная','Кездейсоқ'], vWrong:['С ошибкой','Қатесі бар'], vRight:['Верная','Дұрыс'], vAnother:['Другая','Басқасы'],
+  fold:['Собрать','Құрастыру'], unfold:['Развернуть','Жазу'], flat:['развёртка','жазба'], solid:['фигура','фигура'],
+  check:['Проверка','Тексеру'], quiz:['Проверь себя','Өзіңді тексер'], quizQ:['Соберётся ли эта развёртка в фигуру «{0}»?','Бұл жазбадан «{0}» фигурасы құрастырыла ма?'], yes:['Да, соберётся','Иә, құрастырылады'], no:['Нет, не соберётся','Жоқ, құрастырылмайды'],
+  right:['Верно!','Дұрыс!'], wrongA:['Неверно.','Қате.'], nextQ:['Следующая','Келесі'], closeQ:['Закрыть','Жабу'],
+  gOk:['Развёртка верная — фигура собирается без наложений и дыр.','Жазба дұрыс — фигура қабаттасусыз және саңылаусыз құрастырылады.'],
+  gFaces:['Граней в развёртке: {0} из {1}','Жазбадағы жақтар: {0} / {1}'],
+  gOverlap:['Грани накладываются друг на друга прямо на плоскости: {0}. Такую развёртку нельзя вырезать из одного листа.','Жазықтықта жақтар бірін-бірі жабады: {0}. Мұндай жазбаны бір парақтан қиып алу мүмкін емес.'],
+  gDup:['При сборке грани попадают на одно место: {0}. Одна грань получилась дважды.','Құрастырғанда жақтар бір орынға түседі: {0}. Бір жақ екі рет шықты.'],
+  gMiss:['После сборки остаётся дыра: не хватает грани {0}.','Құрастырғаннан кейін саңылау қалады: {0} жағы жетіспейді.'],
+  gNoOverlap:['Грани не накладываются на плоскости','Жазықтықта жақтар қабаттаспайды'],
+  gFoldFirst:['Нажмите «Собрать», чтобы проверить сборку','Құрастыруды тексеру үшін «Құрастыру» басыңыз'],
+  glueHint:['Нажмите на ребро развёртки — подсветится ребро, с которым оно склеится. Нажмите на вершину — все точки, которые станут одной вершиной.','Жазбаның қырын басыңыз — онымен желімделетін қыр белгіленеді. Төбені басыңыз — бір төбеге айналатын барлық нүктелер белгіленеді.'],
+  glueEdge:['Эти рёбра склеятся в ребро {0}','Бұл қырлар {0} қырына желімделеді'], hingeEdge:['Линия сгиба {0}: здесь грани уже соединены','{0} бүгілу сызығы: мұнда жақтар қосылған'],
+  glueVert:['Эти {0} точки станут одной вершиной {1}','Бұл {0} нүкте бір {1} төбесіне айналады'], glueVert1:['Вершина {0}','{0} төбесі'],
+  netFace:['Станет гранью {0}','{0} жағына айналады'],
+  print:['Развёртка для 3D-модели','3D-модельге арналған жазба'], printBtn:['Развёртка для печати','Басып шығаруға арналған жазба'],
+  legendSeam:['оранжевые края склеятся между собой','қызғылт сары жиектер өзара желімделеді'], legendArc:['синие дуги приклеятся к окружностям оснований','көк доғалар табан шеңберлеріне желімделеді'],
+  noNet:['Сфера не имеет развёртки: её нельзя развернуть на плоскость без разрывов и растяжений. Поэтому глобус рисуют на карте с искажениями.','Сфераның жазбасы жоқ: оны жазықтыққа үзіліссіз және созылмай жазу мүмкін емес. Сондықтан глобус картада бұрмаланып салынады.'],
+  // build
+  buildHint:['Начните с основания. Нажимайте «+» у свободного ребра, чтобы приложить соседнюю грань, «×» — убрать грань. Потом нажмите «Собрать».','Табаннан бастаңыз. Көрші жақты қосу үшін бос қырдың жанындағы «+» басыңыз, «×» — жақты алып тастау. Содан кейін «Құрастыру» басыңыз.'],
+  undo:['Отменить','Болдырмау'], clear:['Начать заново','Қайта бастау'], autofill:['Показать готовую','Дайынын көрсету'],
+  done:['Готово! Ваша развёртка верная.','Дайын! Сіздің жазбаңыз дұрыс.'],
+  yourNet:['Ваша развёртка','Сіздің жазбаңыз'], revTask:['Задача: подберите развёртку так, чтобы фигура собралась. Размеры фигуры заданы выше.','Тапсырма: фигура құрастырылатындай жазбаны таңдаңыз. Фигураның өлшемдері жоғарыда берілген.'],
+  pW:['Длина прямоугольника (боковая поверхность)','Тіктөртбұрыштың ұзындығы (бүйір беті)'], pAng:['Угол сектора','Сектор бұрышы'],
+  cylNeed:['Длина прямоугольника = длине окружности основания: 2πr = {0} см. У вас {1} см.','Тіктөртбұрыштың ұзындығы = табан шеңберінің ұзындығы: 2πr = {0} см. Сізде {1} см.'],
+  coneNeed:['Длина дуги сектора = длине окружности основания: 2πr = {0} см. У вас дуга {1} см. Нужный угол: α = 360°·r/l = {2}°.','Сектор доғасының ұзындығы = табан шеңберінің ұзындығы: 2πr = {0} см. Сізде доға {1} см. Қажетті бұрыш: α = 360°·r/l = {2}°.'],
+  fconeNeed:['Дуги сектора кольца должны быть равны окружностям оснований: 2πR = {0} см и 2πr = {1} см. У вас {2} см и {3} см. Нужный угол: α = 360°·(R−r)/l = {4}°.','Сақина секторының доғалары табан шеңберлеріне тең болуы керек: 2πR = {0} см және 2πr = {1} см. Сізде {2} см және {3} см. Қажетті бұрыш: α = 360°·(R−r)/l = {4}°.'],
+  revOk:['Длины совпадают — края склеятся точно.','Ұзындықтар тең — жиектер дәл желімделеді.'],
+  revShort:['Боковая поверхность мала — основание не закроется.','Бүйір беті кіші — табан жабылмайды.'], revLong:['Боковая поверхность велика — край ляжет внахлёст, основание мало.','Бүйір беті үлкен — жиегі қабаттасады, табан кіші.'],
+  // views
+  vFront:['Спереди','Алдынан'], vTop:['Сверху','Үстінен'], vSide:['Сбоку','Бүйірінен'], v3d:['3D','3D'], zoomIn:['Приблизить','Жақындату'], zoomOut:['Отдалить','Алыстату'], reset:['Сбросить вид','Көріністі қалпына келтіру'],
+  hint:['Крутите фигуру пальцем или мышью · два пальца или колесо — масштаб · нажмите на грань, ребро или вершину','Фигураны саусақпен не тінтуірмен айналдырыңыз · екі саусақ не дөңгелек — масштаб · жақты, қырды не төбені басыңыз'],
+  // print modal
+  pTitle:['Развёртка для склейки','Желімдеуге арналған жазба'], pSize:['Размер с клапанами: {0} × {1} см','Жапсырмалармен өлшемі: {0} × {1} см'], pFits:['Помещается на лист А4.','А4 парағына сыяды.'], pNoFit:['Не помещается на А4 — уменьшите масштаб или размеры фигуры.','А4-ке сыймайды — масштабты не фигура өлшемін кішірейтіңіз.'],
+  pScale:['Масштаб','Масштаб'], pLegend:['Сплошная линия — разрезать, пунктир — сгибать, серые клапаны — смазать клеем.','Тұтас сызық — қию, пунктир — бүгу, сұр жапсырмалар — желім жағу.'],
+  pDownload:['Скачать SVG','SVG жүктеу'], pPrint:['Печать','Басып шығару'], pCopy:['Копировать SVG','SVG көшіру'], pCopied:['Скопировано','Көшірілді'], pClose:['Закрыть','Жабу'],
+  pEmbedded:['Здесь печать недоступна. Скопируйте SVG и вставьте в Word или откройте эту страницу как отдельный сайт — там будут кнопки «Печать» и «Скачать».','Мұнда басып шығару қолжетімсіз. SVG көшіріп, Word-қа қойыңыз немесе бетті жеке сайт ретінде ашыңыз — онда «Басып шығару» және «Жүктеу» батырмалары болады.'],
+  about:['Работает в браузере на телефоне и компьютере, можно открыть как мини-приложение в Telegram. Темы 11.2А: многогранники и тела вращения.','Телефон мен компьютердегі браузерде жұмыс істейді, Telegram-да мини-қосымша ретінде ашуға болады. 11.2А тақырыптары: көпжақтар және айналу денелері.'],
+};
+let lang = ls.get('gran.lang') || 'ru';
+function t(k,...a){ const e=D[k]; let s = e? e[lang==='kz'?1:0] : k; a.forEach((v,i)=>{ s=s.split('{'+i+'}').join(v); }); return s; }
+
+/* ================= shapes & params ================= */
+const SHAPES = {
+  cube:{group:'poly', params:['a'], def:{a:4}},
+  box:{group:'poly', params:['a','b','c'], def:{a:5,b:3,c:4}},
+  prism:{group:'poly', params:['n','a','h'], def:{n:6,a:2.5,h:5}},
+  pyramid:{group:'poly', params:['n','a','h'], def:{n:4,a:5,h:5}},
+  frustum:{group:'poly', params:['n','a','a2','h'], def:{n:4,a:6,a2:3,h:3.5}},
+  tetra:{group:'poly', params:['a'], def:{a:5}, hull:true},
+  octa:{group:'poly', params:['a'], def:{a:4}, hull:true},
+  dodeca:{group:'poly', params:['a'], def:{a:2.5}, hull:true},
+  icosa:{group:'poly', params:['a'], def:{a:3}, hull:true},
+  cylinder:{group:'rev', params:['r','h'], def:{r:2.5,h:5}},
+  cone:{group:'rev', params:['r','h'], def:{r:3,h:5}},
+  fcone:{group:'rev', params:['r','r2','h'], def:{r:3.5,r2:1.5,h:3.5}},
+  sphere:{group:'rev', params:['r'], def:{r:3.5}},
+};
+const POLY_ORDER=['cube','box','prism','pyramid','frustum','tetra','octa','dodeca','icosa'];
+const REV_ORDER=['cylinder','cone','fcone','sphere'];
+function paramDef(shape,k,p){
+  const reg = SHAPES[shape].hull || shape==='cube';
+  switch(k){
+    case 'n': return {label:t('pn'), sym:'n', min:3, max:8, step:1, unit:''};
+    case 'a': return {label: shape==='box'?t('pLen'): reg? t('pEdge'): t('pa'), sym:'a', min:1, max:10, step:.5, unit:t('cm')};
+    case 'b': return {label:t('pWid'), sym:'b', min:1, max:10, step:.5, unit:t('cm')};
+    case 'c': return {label:t('ph'), sym:'c', min:1, max:10, step:.5, unit:t('cm')};
+    case 'a2': return {label:t('pa2'), sym:'a₁', min:.5, max:Math.max(.5,p.a-.5), step:.5, unit:t('cm')};
+    case 'h': return {label:t('ph'), sym:'h', min:1, max:10, step:.5, unit:t('cm')};
+    case 'r': return {label: shape==='sphere'? t('pRs'): shape==='fcone'? t('pR'): t('pr'), sym: shape==='fcone'?'R':(shape==='sphere'?'R':'r'), min:1, max:8, step:.5, unit:t('cm')};
+    case 'r2': return {label:t('pr2'), sym:'r', min:.5, max:Math.max(.5,p.r-.5), step:.5, unit:t('cm')};
+  }
+}
+
+const state = {
+  mode: 'model', shape:'cube',
+  params: Object.fromEntries(Object.entries(SHAPES).map(([k,v])=>[k,{...v.def}])),
+  labels:true, transparent:true, autorotate:false,
+  element:null, sel:null,
+  netVariant:'bfs', netSeed:1, t:0, anim:null, revealed:false,
+  build:{key:null, nodes:null, hist:[]},
+  revUser:{}, revNetWrong:null,
+  quiz:null,
+};
+const P = ()=>state.params[state.shape];
+const isRev = ()=>SHAPES[state.shape].group==='rev';
+
+/* ================= polyhedron geometry ================= */
+const LET='ABCDEFGHKLNPQRTUVWXYZ'.split('');
+function centroid(pts){ const c=new V3(); pts.forEach(p=>c.add(p)); return c.multiplyScalar(1/pts.length); }
+function newell(pts){ const n=new V3(); for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length]; n.x+=(a.y-b.y)*(a.z+b.z); n.y+=(a.z-b.z)*(a.x+b.x); n.z+=(a.x-b.x)*(a.y+b.y);} return n; }
+const ekey=(a,b)=>a<b?a+'_'+b:b+'_'+a;
+function makePoly(V,F,labels,kind){
+  const c=centroid(V);
+  F=F.map(f=>{const pts=f.map(i=>V[i]); const n=newell(pts); return n.dot(centroid(pts).sub(c))<0? f.slice().reverse(): f;});
+  const N=F.map(f=>newell(f.map(i=>V[i])).normalize());
+  const C=F.map(f=>centroid(f.map(i=>V[i])));
+  const edges=new Map();
+  F.forEach((f,fi)=>f.forEach((a,i)=>{const b=f[(i+1)%f.length], k=ekey(a,b); if(!edges.has(k)) edges.set(k,{a:Math.min(a,b),b:Math.max(a,b),faces:[]}); edges.get(k).faces.push(fi);}));
+  const area=F.map(f=>newell(f.map(i=>V[i])).length()/2);
+  const deg=V.map(()=>0); edges.forEach(e=>{deg[e.a]++;deg[e.b]++;});
+  let r=0; V.forEach(v=>r=Math.max(r,v.distanceTo(c)));
+  return {V,F,N,C,edges,labels,kind,area,deg,size:r};
+}
+function neighbor(poly,f,a,b){ const e=poly.edges.get(ekey(a,b)); return e.faces[0]===f?e.faces[1]:e.faces[0]; }
+function basePts(n,a){ const R=a/(2*Math.sin(PI/n)); const out=[]; for(let i=0;i<n;i++){const th=PI/2+PI/n-TAU*i/n; out.push([R*Math.cos(th),R*Math.sin(th)]);} return out; }
+function boxPts(a,b){ return [[-a/2,b/2],[a/2,b/2],[a/2,-b/2],[-a/2,-b/2]]; }
+function prismFrom(base,top,h,kind){
+  const n=base.length, V=[];
+  base.forEach(([x,z])=>V.push(new V3(x,-h/2,z))); top.forEach(([x,z])=>V.push(new V3(x,h/2,z)));
+  const F=[[...Array(n).keys()],[...Array(n).keys()].map(i=>n+i)];
+  for(let i=0;i<n;i++){const j=(i+1)%n; F.push([i,j,n+j,n+i]);}
+  const labels=[...base.map((_,i)=>LET[i]),...base.map((_,i)=>LET[i]+'₁')];
+  return makePoly(V,F,labels,kind);
+}
+function pyramidPoly(n,a,h){
+  const base=basePts(n,a), V=base.map(([x,z])=>new V3(x,-h/2,z)); V.push(new V3(0,h/2,0));
+  const F=[[...Array(n).keys()]]; for(let i=0;i<n;i++) F.push([i,(i+1)%n,n]);
+  return makePoly(V,F,[...base.map((_,i)=>LET[i]),'S'],'pyramid');
+}
+function hullFaces(pts){
+  const faces=[],seen=new Set(),eps=1e-6*(1+pts[0].length());
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)for(let k=j+1;k<pts.length;k++){
+    const n=new V3().subVectors(pts[j],pts[i]).cross(new V3().subVectors(pts[k],pts[i]));
+    if(n.length()<1e-9) continue; n.normalize(); const d=n.dot(pts[i]);
+    let pos=0,neg=0; const on=[];
+    pts.forEach((p,m)=>{const s=n.dot(p)-d; if(s>eps)pos++; else if(s<-eps)neg++; else on.push(m);});
+    if(pos&&neg) continue; if(pos) n.negate();
+    const key=on.slice().sort((x,y)=>x-y).join(','); if(seen.has(key)) continue; seen.add(key);
+    const c=centroid(on.map(m=>pts[m])); const u=pts[on[0]].clone().sub(c).normalize(); const w=n.clone().cross(u);
+    on.sort((x,y)=>{const px=pts[x].clone().sub(c),py=pts[y].clone().sub(c); return Math.atan2(w.dot(px),u.dot(px))-Math.atan2(w.dot(py),u.dot(py));});
+    faces.push(on);
+  }
+  return faces;
+}
+function regularPoly(kind,a){
+  const phi=(1+Math.sqrt(5))/2; let pts=[],s=1;
+  if(kind==='tetra'){ pts=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]]; s=a/(2*Math.SQRT2); }
+  if(kind==='octa'){ pts=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]; s=a/Math.SQRT2; }
+  if(kind==='icosa'){ for(const x of [-1,1])for(const y of [-phi,phi]) pts.push([0,x,y],[x,y,0],[y,0,x]); s=a/2; }
+  if(kind==='dodeca'){ for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1]) pts.push([x,y,z]); for(const x of[-1,1])for(const y of[-1,1]) pts.push([0,x/phi,y*phi],[x/phi,y*phi,0],[y*phi,0,x/phi]); s=a*phi/2; }
+  let P3=pts.map(p=>new V3(...p).multiplyScalar(s));
+  let F=hullFaces(P3);
+  const n0=newell(F[0].map(i=>P3[i])).normalize();
+  const q=new THREE.Quaternion().setFromUnitVectors(n0,new V3(0,-1,0));
+  P3.forEach(p=>p.applyQuaternion(q));
+  // spin so that an edge of the bottom face faces the viewer
+  const bf=F[0], e0=P3[bf[0]].clone().add(P3[bf[1]]).multiplyScalar(.5); const ang=Math.atan2(e0.x,e0.z);
+  const q2=new THREE.Quaternion().setFromAxisAngle(YUP,-ang); P3.forEach(p=>p.applyQuaternion(q2));
+  let minY=Infinity,maxY=-Infinity; P3.forEach(p=>{minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}); const cy=(minY+maxY)/2; P3.forEach(p=>p.y-=cy);
+  // relabel: top to bottom, then around
+  const order=P3.map((p,i)=>i).sort((i,j)=>{const dy=P3[j].y-P3[i].y; if(Math.abs(dy)>1e-6) return dy; return Math.atan2(-P3[i].z,P3[i].x)-Math.atan2(-P3[j].z,P3[j].x);});
+  const remap=[]; order.forEach((old,nw)=>remap[old]=nw);
+  const V=order.map(i=>P3[i]); F=F.map(f=>f.map(i=>remap[i]));
+  return makePoly(V,F,V.map((_,i)=>LET[i]),kind);
+}
+function buildPoly(shape,p){
+  switch(shape){
+    case 'cube': return prismFrom(boxPts(p.a,p.a),boxPts(p.a,p.a),p.a,'cube');
+    case 'box': return prismFrom(boxPts(p.a,p.b),boxPts(p.a,p.b),p.c,'box');
+    case 'prism': { const b=basePts(p.n,p.a); return prismFrom(b,b,p.h,'prism'); }
+    case 'pyramid': return pyramidPoly(p.n,p.a,p.h);
+    case 'frustum': return prismFrom(basePts(p.n,p.a),basePts(p.n,Math.min(p.a2,p.a-.5)),p.h,'frustum');
+    default: return regularPoly(shape,p.a);
+  }
+}
+function faceName(poly,f){ return poly.F[f].map(i=>poly.labels[i]).join(''); }
+function faceKind(poly,f){
+  const k=poly.kind, ny=poly.N[f].y;
+  if(['tetra','octa','dodeca','icosa'].includes(k)) return 'eFace';
+  if(ny<-0.999) return 'eBase'; if(ny>0.999 && k!=='pyramid') return k==='frustum'||k==='prism'||k==='cube'||k==='box'? 'eTop':'eFace';
+  return 'eLatFace';
+}
+function polyShapeName(poly,f,p){
+  const n=poly.F[f].length, k=poly.kind, kind=faceKind(poly,f);
+  if(k==='cube') return t('square');
+  if(k==='box') return t('rect');
+  if(k==='tetra'||k==='octa'||k==='icosa') return t('eqTri');
+  if(k==='dodeca') return t('regPent');
+  if(kind==='eBase'||kind==='eTop') return n===3? t('eqTri'): n===4? t('square'): t('regularShape')+' '+t(['','','','tri','quad','pent','hex','hept','oct'][n]);
+  if(k==='prism') return Math.abs(p.a-p.h)<1e-9? t('square'): t('rect');
+  if(k==='pyramid'){ const V=poly.V, le=V[poly.F[f][0]].distanceTo(V[poly.F[f][2]]); return Math.abs(le-p.a)<1e-6? t('eqTri'): t('isoTri'); }
+  if(k==='frustum') return t('isoTrap');
+  return t(['','','','tri','quad','pent','hex','hept','oct'][n]);
+}
+function edgeKind(poly,a,b){
+  const k=poly.kind; if(['tetra','octa','dodeca','icosa'].includes(k)) return 'eEdge';
+  const e=poly.edges.get(ekey(a,b));
+  for(const f of e.faces){ const ny=poly.N[f].y; if(ny<-0.999) return 'eBaseEdge'; if(ny>0.999) return 'eTopEdge'; }
+  return 'eLatEdge';
+}
+
+/* ================= area worksheets ================= */
+const sub=k=>`<sub>${t(k)}</sub>`;
+function piv(k){ return `${fmt(k)}π ≈ ${fmt(k*PI)}`; }
+function areaRows(shape,p){
+  const R=[], sb='S'+sub('sBase'), sl='S'+sub('sLat'), sf='S'+sub('sFull'), u=' '+t('cm')+'²';
+  const row=(k,f,total)=>R.push({k,f,total});
+  const nf=(n,a)=> n===3? [`(√3/4)·a²`, Math.sqrt(3)/4*a*a]: n===4? ['a²',a*a]: n===6? ['(3√3/2)·a²',3*Math.sqrt(3)/2*a*a]: [`n·a² / (4·tg(180°/n))`, n*a*a/(4*Math.tan(PI/n))];
+  if(shape==='cube'){ const S=6*p.a*p.a; row(t('kFull'),`S = 6a² = 6·${fmt(p.a)}² = <b>${fmt(S)}</b>${u}`,1); row(t('kDiag'),`d = a√3 ≈ ${fmt(p.a*Math.sqrt(3))} ${t('cm')}`); }
+  else if(shape==='box'){ const {a,b,c}=p, S=2*(a*b+b*c+a*c); row(t('kFull'),`S = 2(ab + bc + ac) = 2(${fmt(a*b)} + ${fmt(b*c)} + ${fmt(a*c)}) = <b>${fmt(S)}</b>${u}`,1); row(t('kDiag'),`d = √(a² + b² + c²) ≈ ${fmt(Math.hypot(a,b,c))} ${t('cm')}`); }
+  else if(shape==='prism'){ const {n,a,h}=p, [ff,Sb]=nf(n,a), Sl=n*a*h;
+    row(t('kBase'),`${sb} = ${ff} ≈ ${fmt(Sb)}${u}`); row(t('kLat'),`${sl} = P·h = n·a·h = ${n}·${fmt(a)}·${fmt(h)} = ${fmt(Sl)}${u}`); row(t('kFull'),`${sf} = ${sl} + 2${sb} ≈ <b>${fmt(Sl+2*Sb)}</b>${u}`,1); }
+  else if(shape==='pyramid'){ const {n,a,h}=p, [ff,Sb]=nf(n,a), r=a/(2*Math.tan(PI/n)), m=Math.hypot(h,r), Sl=n*a*m/2;
+    row(t('kRin'),`r = a / (2·tg(180°/n)) ≈ ${fmt(r)} ${t('cm')}`); row(t('kApo'),`m = √(h² + r²) ≈ ${fmt(m)} ${t('cm')}`);
+    row(t('kBase'),`${sb} = ${ff} ≈ ${fmt(Sb)}${u}`); row(t('kLat'),`${sl} = ½·P·m = ½·${n}·${fmt(a)}·${fmt(m)} ≈ ${fmt(Sl)}${u}`); row(t('kFull'),`${sf} = ${sl} + ${sb} ≈ <b>${fmt(Sl+Sb)}</b>${u}`,1); }
+  else if(shape==='frustum'){ const {n,a,h}=p, a2=Math.min(p.a2,a-.5), [ff,S1]=nf(n,a), S2=nf(n,a2)[1], r1=a/(2*Math.tan(PI/n)), r2=a2/(2*Math.tan(PI/n)), m=Math.hypot(h,r1-r2), Sl=n*(a+a2)/2*m;
+    row(t('kRin1'),`r₁ ≈ ${fmt(r1)}, r₂ ≈ ${fmt(r2)} ${t('cm')}`); row(t('kApo'),`m = √(h² + (r₁ − r₂)²) ≈ ${fmt(m)} ${t('cm')}`);
+    row(t('kBase1')+' / '+t('kBase2').toLowerCase(),`S₁ ≈ ${fmt(S1)}, S₂ ≈ ${fmt(S2)}${u}`); row(t('kLat'),`${sl} = ½·(P₁ + P₂)·m ≈ ${fmt(Sl)}${u}`); row(t('kFull'),`${sf} = ${sl} + S₁ + S₂ ≈ <b>${fmt(Sl+S1+S2)}</b>${u}`,1); }
+  else if(shape==='tetra'){ row(t('kFull'),`S = √3·a² ≈ <b>${fmt(Math.sqrt(3)*p.a*p.a)}</b>${u}`,1); }
+  else if(shape==='octa'){ row(t('kFull'),`S = 2√3·a² ≈ <b>${fmt(2*Math.sqrt(3)*p.a*p.a)}</b>${u}`,1); }
+  else if(shape==='icosa'){ row(t('kFull'),`S = 5√3·a² ≈ <b>${fmt(5*Math.sqrt(3)*p.a*p.a)}</b>${u}`,1); }
+  else if(shape==='dodeca'){ row(t('kFull'),`S = 3√(25 + 10√5)·a² ≈ <b>${fmt(3*Math.sqrt(25+10*Math.sqrt(5))*p.a*p.a)}</b>${u}`,1); }
+  else if(shape==='cylinder'){ const {r,h}=p; row(t('kBase'),`${sb} = πr² = ${piv(r*r)}${u}`); row(t('kLat'),`${sl} = 2πrh = ${piv(2*r*h)}${u}`); row(t('kFull'),`${sf} = 2πr(r + h) = <b>${piv(2*r*(r+h))}</b>${u}`,1); }
+  else if(shape==='cone'){ const {r,h}=p, l=Math.hypot(r,h); row(t('kGen'),`l = √(r² + h²) ≈ ${fmt(l)} ${t('cm')}`); row(t('kBase'),`${sb} = πr² = ${piv(r*r)}${u}`); row(t('kLat'),`${sl} = πrl ≈ ${piv(r*l)}${u}`); row(t('kFull'),`${sf} = πr(r + l) ≈ <b>${piv(r*(r+l))}</b>${u}`,1); }
+  else if(shape==='fcone'){ const R0=p.r, r=Math.min(p.r2,p.r-.5), h=p.h, l=Math.hypot(h,R0-r); row(t('kGen'),`l = √(h² + (R − r)²) ≈ ${fmt(l)} ${t('cm')}`); row(t('kBase1')+' / '+t('kBase2').toLowerCase(),`πR² = ${piv(R0*R0)}; πr² = ${piv(r*r)}${u}`); row(t('kLat'),`${sl} = π(R + r)·l ≈ ${piv((R0+r)*l)}${u}`); row(t('kFull'),`${sf} = π(R + r)l + πR² + πr² ≈ <b>${piv((R0+r)*l+R0*R0+r*r)}</b>${u}`,1); }
+  else if(shape==='sphere'){ row(t('kFull'),`S = 4πR² = <b>${piv(4*p.r*p.r)}</b>${u}`,1); }
+  return R;
+}
+
+/* ================= renderer & camera ================= */
+const view=$('#view'), overlay=$('#overlay');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.setClearColor(0x000000,0);
+view.insertBefore(renderer.domElement, overlay);
+renderer.domElement.setAttribute('aria-label','3D');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,1,0.05,500);
+scene.add(camera);
+scene.add(new THREE.AmbientLight(0xffffff,.62));
+const dl=new THREE.DirectionalLight(0xffffff,.55); dl.position.set(1.2,1.6,2); camera.add(dl);
+const dl2=new THREE.DirectionalLight(0xffffff,.18); dl2.position.set(-1,-.5,-1); camera.add(dl2);
+const root=new THREE.Group(); scene.add(root);
+let dirty=true; const markDirty=()=>{dirty=true;};
+
+const orbit={theta:.62,phi:1.12,dist:18,target:new V3(),vt:0,vp:0,tween:null};
+function applyCam(){ const s=Math.sin(orbit.phi); camera.position.set(orbit.target.x+orbit.dist*s*Math.sin(orbit.theta), orbit.target.y+orbit.dist*Math.cos(orbit.phi), orbit.target.z+orbit.dist*s*Math.cos(orbit.theta)); camera.up.set(0,1,0); camera.lookAt(orbit.target); }
+function camTo(theta,phi,dist,target,ms=550){
+  const from={theta:orbit.theta,phi:orbit.phi,dist:orbit.dist,target:orbit.target.clone()};
+  let dth=theta-from.theta; dth=((dth+PI)%TAU+TAU)%TAU-PI;
+  orbit.tween={from,to:{theta:from.theta+dth,phi,dist:dist??from.dist,target:target?target.clone():from.target},start:performance.now(),ms};
+  orbit.vt=orbit.vp=0;
+}
+function resize(){ const w=view.clientWidth,h=view.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); markDirty(); }
+new ResizeObserver(resize).observe(view);
+
+/* ---------- colors & materials ---------- */
+const COL={};
+function readColors(){ const cs=getComputedStyle(document.documentElement); ['face-base','face-side','face-top','edge','edge-hidden','mark','err','accent','ok','paper'].forEach(k=>COL[k]=new THREE.Color(cs.getPropertyValue('--'+k).trim()||'#888')); }
+readColors();
+const MAT={};
+function mkMats(){
+  MAT.edge=new THREE.MeshBasicMaterial({transparent:true});
+  MAT.hidden=new THREE.MeshBasicMaterial({transparent:true,opacity:.8,depthWrite:false,depthFunc:THREE.GreaterDepth});
+  MAT.mark=new THREE.MeshBasicMaterial({transparent:true,depthTest:false,depthWrite:false});
+  MAT.markFill=new THREE.MeshBasicMaterial({transparent:true,opacity:.38,depthTest:false,depthWrite:false,side:THREE.DoubleSide});
+  MAT.err=new THREE.MeshBasicMaterial({transparent:true});
+  MAT.errFill=new THREE.MeshBasicMaterial({transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide});
+  MAT.accent=new THREE.MeshBasicMaterial({transparent:true});
+  MAT.dot=new THREE.MeshBasicMaterial({transparent:true,depthTest:false});
+  MAT.faces=new THREE.MeshLambertMaterial({vertexColors:true,transparent:true,opacity:.55,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+  MAT.revSide=new THREE.MeshLambertMaterial({transparent:true,opacity:.55,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+  MAT.revBase=MAT.revSide.clone();
+  MAT.netSide=new THREE.MeshLambertMaterial({transparent:true,opacity:.92,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+  MAT.netBase=MAT.netSide.clone();
+}
+mkMats();
+function paintMats(){
+  MAT.edge.color.copy(COL.edge); MAT.hidden.color.copy(COL['edge-hidden']); MAT.mark.color.copy(COL.mark); MAT.markFill.color.copy(COL.mark);
+  MAT.err.color.copy(COL.err); MAT.errFill.color.copy(COL.err); MAT.accent.color.copy(COL.accent); MAT.dot.color.copy(COL.edge);
+  MAT.revSide.color.copy(COL['face-side']); MAT.revBase.color.copy(COL['face-base']); MAT.netSide.color.copy(COL['face-side']); MAT.netBase.color.copy(COL['face-base']);
+  const op=state.transparent?.5:.93; MAT.faces.opacity=op; MAT.revSide.opacity=op; MAT.revBase.opacity=op;
+}
+paintMats();
+function onTheme(){ readColors(); paintMats(); rebuild(); }
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',onTheme); }catch(e){}
+new MutationObserver(onTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- thick segments ---------- */
+const segGeo=new THREE.CylinderGeometry(1,1,1,10,1,true);
+const ballGeo=new THREE.SphereGeometry(1,14,10);
+const _d=new V3();
+function setSeg(m,p,q,r){ _d.subVectors(q,p); const L=_d.length()||1e-6; m.position.addVectors(p,q).multiplyScalar(.5); m.quaternion.setFromUnitVectors(YUP,_d.multiplyScalar(1/L)); m.scale.set(r,L,r); m.updateMatrix(); }
+function seg(p,q,r,mat,order=3){ const m=new THREE.Mesh(segGeo,mat); m.renderOrder=order; setSeg(m,p,q,r); return m; }
+function ball(p,r,mat,order=6){ const m=new THREE.Mesh(ballGeo,mat); m.position.copy(p); m.scale.setScalar(r); m.renderOrder=order; return m; }
+let SZ=1; const ER=()=>SZ*0.013, DASH=()=>SZ*0.07;
+function addEdge(g,p,q,opt={}){
+  const r=opt.r||ER(); g.add(seg(p,q,r,opt.mat||MAT.edge,3));
+  if(opt.hidden===false) return;
+  const L=p.distanceTo(q), n=Math.max(2,Math.round(L/DASH())), step=1/n;
+  for(let k=0;k<n;k++){ const a=p.clone().lerp(q,k*step), b=p.clone().lerp(q,k*step+step*.55); g.add(seg(a,b,r*.75,MAT.hidden,2)); }
+}
+function addPolyline(g,pts,closed,opt={}){
+  const r=opt.r||ER(), n=pts.length-(closed?0:1);
+  for(let i=0;i<n;i++){ const a=pts[i],b=pts[(i+1)%pts.length]; g.add(seg(a,b,r,opt.mat||MAT.edge,3)); if(opt.hidden!==false && i%2===0) g.add(seg(a,b,r*.75,MAT.hidden,2)); }
+}
+function circlePts(c,R,n=72,y){ const out=[]; for(let i=0;i<n;i++){const a=TAU*i/n; out.push(new V3(c.x+R*Math.cos(a),y??c.y,c.z+R*Math.sin(a)));} return out; }
+function dynLine(g,n,mat,rf){ const ms=[]; for(let i=0;i<n;i++){const m=new THREE.Mesh(segGeo,mat); m.renderOrder=4; m.matrixAutoUpdate=false; g.add(m); ms.push(m);} return { set(pts){ const r=rf(); ms.forEach((m,i)=>{ if(i<pts.length-1){ m.visible=true; setSeg(m,pts[i],pts[i+1],r);} else m.visible=false; }); } }; }
+
+/* ---------- overlay labels ---------- */
+let labels=[];
+function clearLabels(){ labels.forEach(l=>l.el.remove()); labels=[]; }
+function addLabel(text,pos,cls='',opts={}){
+  const el=document.createElement(opts.button?'button':'div'); el.className=opts.button?('hbtn '+cls):('lbl '+cls); el.textContent=text;
+  if(opts.button){ el.type='button'; el.setAttribute('aria-label',opts.aria||text); el.addEventListener('click',e=>{e.stopPropagation();opts.onClick();}); el.addEventListener('pointerdown',e=>e.stopPropagation()); }
+  overlay.appendChild(el); const L={el,pos,vis:opts.vis}; labels.push(L); return L;
+}
+const _p=new V3();
+function updateLabels(){
+  const w=view.clientWidth,h=view.clientHeight;
+  for(const L of labels){
+    const p=typeof L.pos==='function'?L.pos():L.pos; _p.copy(p).project(camera);
+    if(_p.z>1||!L.on&&L.on!==undefined){ L.el.style.opacity=0; continue; }
+    const x=(_p.x*.5+.5)*w, y=(-_p.y*.5+.5)*h;
+    L.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`+(L.el.classList.contains('hbtn')?'':' translate(-50%,-50%)');
+    let op=1; if(L.vis) op=L.vis();
+    L.el.style.opacity=op;
+  }
+}
+
+/* ================= scene builders ================= */
+let cur=null; // current scene descriptor
+function disposeRoot(){ root.traverse(o=>{ if(o.geometry && o.geometry!==segGeo && o.geometry!==ballGeo) o.geometry.dispose(); if(o.material && o.userData.ownMat) o.material.dispose(); }); root.clear(); }
+
+function faceColor(poly,f){ const k=faceKind(poly,f); return k==='eBase'? COL['face-base']: k==='eTop'? COL['face-top']: COL['face-side']; }
+function frontFacing(poly,f){ return poly.N[f].dot(camera.position.clone().sub(poly.C[f]))>0; }
+
+function buildPolyModel(){
+  const poly=buildPoly(state.shape,P()); SZ=poly.size;
+  const g=new THREE.Group(); root.add(g);
+  const pos=[],col=[],triFace=[];
+  poly.F.forEach((f,fi)=>{ const c=faceColor(poly,fi); for(let i=1;i<f.length-1;i++){ [f[0],f[i],f[i+1]].forEach(vi=>{const v=poly.V[vi]; pos.push(v.x,v.y,v.z); col.push(c.r,c.g,c.b);}); triFace.push(fi);} });
+  const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,MAT.faces); mesh.renderOrder=1; g.add(mesh);
+  poly.edges.forEach(e=>addEdge(g,poly.V[e.a],poly.V[e.b]));
+  poly.V.forEach(v=>g.add(ball(v,ER()*1.6,MAT.dot,5)));
+  const marks=new THREE.Group(); g.add(marks);
+  if(state.labels){
+    const c=centroid(poly.V);
+    poly.V.forEach((v,i)=>{ const dir=v.clone().sub(c).normalize(); const p=v.clone().add(dir.multiplyScalar(SZ*.11));
+      addLabel(poly.labels[i],p,'',{vis:()=>{ for(let f=0;f<poly.F.length;f++) if(poly.F[f].includes(i)&&frontFacing(poly,f)) return 1; return .38; }}); });
+  }
+  cur={type:'polyModel',poly,mesh,triFace,marks,group:g};
+  applyElement();
+}
+function recolorFaces(){
+  if(!cur||cur.type!=='polyModel') return; const {poly,mesh,triFace}=cur, col=mesh.geometry.attributes.color;
+  triFace.forEach((f,ti)=>{ const c=(state.sel&&state.sel.kind==='face'&&state.sel.f===f)? COL.mark: faceColor(poly,f); for(let k=0;k<3;k++) col.setXYZ(ti*3+k,c.r,c.g,c.b); });
+  col.needsUpdate=true;
+}
+
+/* ----- revolution model ----- */
+function revDims(){ const p=P(); if(state.shape==='fcone') return {R1:p.r,R2:Math.min(p.r2,p.r-.5),h:p.h}; if(state.shape==='cone') return {R1:p.r,R2:0,h:p.h}; if(state.shape==='cylinder') return {R1:p.r,R2:p.r,h:p.h}; return {R:p.r}; }
+function buildRevModel(){
+  const g=new THREE.Group(); root.add(g); const marks=new THREE.Group(); g.add(marks);
+  const sh=state.shape;
+  if(sh==='sphere'){
+    const R=P().r; SZ=R;
+    const m=new THREE.Mesh(new THREE.SphereGeometry(R,64,40),MAT.revSide); m.renderOrder=1; m.userData.part='eSurface'; g.add(m);
+    addPolyline(g,circlePts(new V3(),R,96,0),true);
+    const sil=dynLine(g,97,MAT.edge,()=>ER());
+    g.add(ball(new V3(),ER()*1.8,MAT.dot,5));
+    if(state.labels) addLabel('O',new V3(SZ*.07,SZ*.07,0));
+    cur={type:'revModel',group:g,marks,pick:[m],update(){ const C=camera.position, d=C.length(); if(d<=R*1.001){sil.set([]);return;} const ax=C.clone().normalize(), c=ax.clone().multiplyScalar(R*R/d), rho=R*Math.sqrt(1-R*R/(d*d)); const u=new V3().crossVectors(ax,Math.abs(ax.y)<.9?YUP:new V3(1,0,0)).normalize(), w=new V3().crossVectors(ax,u); const pts=[]; for(let i=0;i<=96;i++){const a=TAU*i/96; pts.push(c.clone().addScaledVector(u,rho*Math.cos(a)).addScaledVector(w,rho*Math.sin(a)));} sil.set(pts); }};
+  } else {
+    const {R1,R2,h}=revDims(); SZ=Math.hypot(Math.max(R1,R2),h/2);
+    const lat=new THREE.Mesh(new THREE.CylinderGeometry(R2,R1,h,96,1,true),MAT.revSide); lat.renderOrder=1; lat.userData.part='eLatSurf'; g.add(lat);
+    const pick=[lat];
+    const b1=new THREE.Mesh(new THREE.CircleGeometry(R1,96),MAT.revBase); b1.rotation.x=PI/2; b1.position.y=-h/2; b1.renderOrder=1; b1.userData.part='eBase'; g.add(b1); pick.push(b1);
+    addPolyline(g,circlePts(new V3(),R1,96,-h/2),true);
+    if(R2>0){ const b2=new THREE.Mesh(new THREE.CircleGeometry(R2,96),MAT.revBase); b2.rotation.x=-PI/2; b2.position.y=h/2; b2.renderOrder=1; b2.userData.part='eTop'; g.add(b2); pick.push(b2); addPolyline(g,circlePts(new V3(),R2,96,h/2),true); }
+    else g.add(ball(new V3(0,h/2,0),ER()*1.6,MAT.dot,5));
+    const sil=dynLine(g,4,MAT.edge,()=>ER());
+    // dashed axis
+    if(state.labels){ addLabel('O',new V3(SZ*.06,-h/2-SZ*.07,0)); addLabel(R2>0?'O₁':'S',new V3(SZ*.06,h/2+SZ*.08,0)); }
+    cur={type:'revModel',group:g,marks,pick,update(){
+      const C=camera.position, roots=[], N=180;
+      const f=phi=>{ const c=Math.cos(phi),s=Math.sin(phi); const Pp=new V3(R1*c,-h/2,R1*s), Q=new V3(R2*c,h/2,R2*s), tv=new V3(-s,0,c); const n=new V3().subVectors(Q,Pp).cross(tv); return C.clone().sub(Pp).dot(n); };
+      let prev=f(0); for(let i=1;i<=N;i++){ const ph=TAU*i/N, v=f(ph); if(prev===0||prev*v<0){ let a=TAU*(i-1)/N,b=ph,fa=prev; for(let k=0;k<22;k++){const m=(a+b)/2,fm=f(m); if(fa*fm<=0)b=m; else {a=m;fa=fm;}} roots.push((a+b)/2);} prev=v; }
+      const pts=[]; roots.slice(0,2).forEach(ph=>{ const c=Math.cos(ph),s=Math.sin(ph); pts.push(new V3(R1*c,-h/2,R1*s),new V3(R2*c,h/2,R2*s)); });
+      // set as two separate segments
+      const segs=[]; for(let i=0;i<pts.length;i+=2){ segs.push(pts[i],pts[i+1]); }
+      sil.set([]); // reset
+      const ms=g.children.filter(o=>o.matrixAutoUpdate===false&&o.geometry===segGeo);
+      ms.forEach((m,i)=>{ if(i*2+1<segs.length){ m.visible=true; setSeg(m,segs[i*2],segs[i*2+1],ER()); } else m.visible=false; });
+    }};
+  }
+  applyElement();
+}
+
+/* ----- elements ----- */
+function elementsList(){
+  const sh=state.shape, p=P(), out=[];
+  const E=(id,kind,pts,extra={})=>out.push({id,kind,pts,...extra});
+  if(SHAPES[sh].group==='poly'){
+    const poly=cur&&cur.poly? cur.poly: buildPoly(sh,p), V=poly.V, L=poly.labels;
+    if(['cube','box','prism'].includes(sh)){
+      const n=sh==='prism'?p.n:4;
+      E('eHeightLat','seg',[V[0],V[n]],{name:L[0]+L[n],sym:sh==='box'?'c':'h'});
+      E('eBaseEdge','seg',[V[0],V[1]],{name:L[0]+L[1],sym:'a'});
+      if(sh==='box') E('eBaseEdge','seg',[V[1],V[2]],{name:L[1]+L[2],sym:'b',uid:'b2'});
+      E('eBase','poly',poly.F[0].map(i=>V[i]),{name:faceName(poly,0)});
+      E('eLatFace','poly',[V[0],V[1],V[n+1],V[n]],{name:L[0]+L[1]+L[n+1]+L[n]});
+      if(n>=4){ E('eBaseDiag','seg',[V[0],V[2]],{name:L[0]+L[2]}); E('eDiag','seg',[V[0],V[n+2]],{name:L[0]+L[n+2],sym:'d'}); E('eDiagSec','poly',[V[0],V[2],V[n+2],V[n]],{name:L[0]+L[2]+L[n+2]+L[n]}); }
+      if(n===4) E('eFaceDiag','seg',[V[0],V[n+1]],{name:L[0]+L[n+1]});
+    } else if(sh==='pyramid'){
+      const n=p.n, S=V[n], O=new V3(0,-p.h/2,0), M=V[0].clone().add(V[1]).multiplyScalar(.5);
+      E('eHeight','seg',[S,O],{name:'SO',sym:'h',pl:[[O,'O']]});
+      E('eApo','seg',[S,M],{name:'SM',sym:'m',pl:[[M,'M']]});
+      E('eLatEdge','seg',[S,V[0]],{name:'S'+L[0]});
+      E('eBaseEdge','seg',[V[0],V[1]],{name:L[0]+L[1],sym:'a'});
+      E('eBase','poly',poly.F[0].map(i=>V[i]),{name:faceName(poly,0)});
+      E('eLatFace','poly',[S,V[0],V[1]],{name:'S'+L[0]+L[1]});
+      E('eRin','seg',[O,M],{name:'OM',sym:'r',pl:[[O,'O'],[M,'M']]});
+      E('eRout','seg',[O,V[0]],{name:'O'+L[0],sym:'R',pl:[[O,'O']]});
+    } else if(sh==='frustum'){
+      const n=p.n, O=new V3(0,-p.h/2,0), O1=new V3(0,p.h/2,0), M=V[0].clone().add(V[1]).multiplyScalar(.5), M1=V[n].clone().add(V[n+1]).multiplyScalar(.5);
+      E('eHeight','seg',[O,O1],{name:'OO₁',sym:'h',pl:[[O,'O'],[O1,'O₁']]});
+      E('eApo','seg',[M,M1],{name:'MM₁',sym:'m',pl:[[M,'M'],[M1,'M₁']]});
+      E('eLatEdge','seg',[V[0],V[n]],{name:L[0]+L[n]});
+      E('eBaseEdge','seg',[V[0],V[1]],{name:L[0]+L[1],sym:'a'});
+      E('eTopEdge','seg',[V[n],V[n+1]],{name:L[n]+L[n+1],sym:'a₁'});
+      E('eBase','poly',poly.F[0].map(i=>V[i]),{name:faceName(poly,0)});
+      E('eTop','poly',poly.F[1].map(i=>V[i]),{name:faceName(poly,1)});
+      E('eLatFace','poly',[V[0],V[1],V[n+1],V[n]],{name:L[0]+L[1]+L[n+1]+L[n]});
+    } else {
+      const e=[...poly.edges.values()][0];
+      E('eEdge','seg',[V[e.a],V[e.b]],{name:L[e.a]+L[e.b],sym:'a'});
+      E('eFace','poly',poly.F[0].map(i=>V[i]),{name:faceName(poly,0)});
+      E('eVertex','pt',[V[0]],{name:L[0]});
+    }
+  } else {
+    if(sh==='sphere'){ const R=p.r, O=new V3(), A=new V3(R*Math.cos(.6),0,R*Math.sin(.6)), B=A.clone().negate();
+      E('eCenter','pt',[O],{name:'O'}); E('eRadius','seg',[O,A],{name:'OA',sym:'R',pl:[[A,'A']]}); E('eDiam','seg',[B,A],{name:'AB',sym:'d',pl:[[A,'A'],[B,'B']]});
+      E('eGreat','disk',[O],{r:R,y:0}); E('eSection','disk',[new V3(0,R*.55,0)],{r:R*Math.sqrt(1-.55*.55),y:R*.55});
+    } else {
+      const {R1,R2,h}=revDims(), ang=PI/4, c=Math.cos(ang), s=Math.sin(ang);
+      const O=new V3(0,-h/2,0), O1=new V3(0,h/2,0), A=new V3(R1*c,-h/2,R1*s), B=new V3(-R1*c,-h/2,-R1*s), A1=new V3(R2*c,h/2,R2*s), B1=new V3(-R2*c,h/2,-R2*s);
+      const top=R2>0?'O₁':'S';
+      if(sh==='cylinder'){ E('eAxis','seg',[O,O1],{name:'OO₁',sym:'h',pl:[[O,'O'],[O1,'O₁']]}); E('eRadius','seg',[O,A],{name:'OA',sym:'r',pl:[[A,'A']]}); E('eGen','seg',[A,A1],{name:'AA₁',sym:'h',pl:[[A,'A'],[A1,'A₁']]}); E('eDiam','seg',[B,A],{name:'AB',sym:'d',pl:[[A,'A'],[B,'B']]}); E('eAxSec','poly',[A,B,B1,A1],{name:'ABB₁A₁',pl:[[A,'A'],[B,'B'],[A1,'A₁'],[B1,'B₁']]}); E('eBase','disk',[O],{r:R1,y:-h/2}); }
+      if(sh==='cone'){ E('eConeApex','pt',[O1],{name:'S'}); E('eHeight','seg',[O1,O],{name:'SO',sym:'h',pl:[[O,'O']]}); E('eRadius','seg',[O,A],{name:'OA',sym:'r',pl:[[A,'A']]}); E('eGen','seg',[O1,A],{name:'SA',sym:'l',pl:[[A,'A']]}); E('eAxSec','poly',[A,B,O1],{name:'SAB',pl:[[A,'A'],[B,'B']]}); E('eBase','disk',[O],{r:R1,y:-h/2}); }
+      if(sh==='fcone'){ E('eHeight','seg',[O,O1],{name:'OO₁',sym:'h',pl:[[O,'O'],[O1,'O₁']]}); E('eRadius','seg',[O,A],{name:'OA',sym:'R',pl:[[A,'A']]}); E('eRadius2','seg',[O1,A1],{name:'O₁A₁',sym:'r',pl:[[A1,'A₁']]}); E('eGen','seg',[A,A1],{name:'AA₁',sym:'l',pl:[[A,'A'],[A1,'A₁']]}); E('eAxSec','poly',[A,B,B1,A1],{name:'ABB₁A₁',pl:[[A,'A'],[B,'B'],[A1,'A₁'],[B1,'B₁']]}); E('eBase','disk',[O],{r:R1,y:-h/2}); }
+    }
+  }
+  out.forEach(e=>e.uid=e.uid||e.id);
+  return out;
+}
+let elLabels=[];
+function applyElement(){
+  if(!cur||!cur.marks) return;
+  cur.marks.clear(); elLabels.forEach(l=>{l.el.remove(); labels.splice(labels.indexOf(l),1);}); elLabels=[];
+  const lab=(txt,pos,cls)=>{ elLabels.push(addLabel(txt,pos,cls)); };
+  if(state.element){
+    const e=elementsList().find(x=>x.uid===state.element); if(!e){ state.element=null; return; }
+    const r=ER()*1.7;
+    if(e.kind==='seg'){ const [a,b]=e.pts; cur.marks.add(seg(a,b,r,MAT.mark,7)); cur.marks.add(ball(a,r*1.3,MAT.mark,7)); cur.marks.add(ball(b,r*1.3,MAT.mark,7));
+      const L=a.distanceTo(b); lab(`${e.sym?e.sym+' = ':''}${fmt(L)}`,a.clone().add(b).multiplyScalar(.5).add(new V3(0,SZ*.08,0)),'el'); }
+    if(e.kind==='poly'){ const pts=e.pts, geo=new THREE.BufferGeometry(), pos=[]; for(let i=1;i<pts.length-1;i++) [pts[0],pts[i],pts[i+1]].forEach(v=>pos.push(v.x,v.y,v.z)); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); const m=new THREE.Mesh(geo,MAT.markFill); m.renderOrder=6; cur.marks.add(m); pts.forEach((p,i)=>cur.marks.add(seg(p,pts[(i+1)%pts.length],r*.8,MAT.mark,7)));
+      const A=newell(pts).length()/2; lab(`S ≈ ${fmt(A)}`,centroid(pts),'el'); }
+    if(e.kind==='pt'){ cur.marks.add(ball(e.pts[0],r*2.2,MAT.mark,7)); lab(e.name,e.pts[0].clone().add(new V3(0,SZ*.14,0)),'el'); }
+    if(e.kind==='disk'){ const g=new THREE.Mesh(new THREE.CircleGeometry(e.r,72),MAT.markFill); g.rotation.x=-PI/2; g.position.copy(e.pts[0]); g.renderOrder=6; cur.marks.add(g); const cp=circlePts(e.pts[0],e.r,72,e.pts[0].y); cp.forEach((p,i)=>cur.marks.add(seg(p,cp[(i+1)%cp.length],r*.7,MAT.mark,7))); lab(`S = ${fmt(e.r*e.r)}π ≈ ${fmt(PI*e.r*e.r)}`,e.pts[0].clone().add(new V3(0,SZ*.06,0)),'el'); }
+    (e.pl||[]).forEach(([p,txt])=>lab(txt,p.clone().add(new V3(SZ*.07,SZ*.07,0)),'pt'));
+  }
+  // selection by tap (polyModel)
+  if(state.sel && cur.type==='polyModel'){
+    const {poly}=cur, s=state.sel, r=ER()*1.8;
+    if(s.kind==='edge') cur.marks.add(seg(poly.V[s.a],poly.V[s.b],r,MAT.mark,7));
+    if(s.kind==='vertex') cur.marks.add(ball(poly.V[s.v],r*2.4,MAT.mark,7));
+  }
+  if(cur.type==='polyModel') recolorFaces();
+  markDirty();
+}
+
+/* ================= nets (polyhedra) ================= */
+function rng(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13; s^=s>>>17; s^=s<<5; return ((s>>>0)%100000)/100000; }; }
+function treeBFS(poly){ const nodes=[{face:0,parent:-1,hinge:null}], seen=new Set([0]); for(let qi=0;qi<nodes.length;qi++){ const f=nodes[qi].face, F=poly.F[f]; F.forEach((a,i)=>{ const b=F[(i+1)%F.length], g=neighbor(poly,f,a,b); if(!seen.has(g)){ seen.add(g); nodes.push({face:g,parent:qi,hinge:[a,b]}); } }); } return nodes; }
+function treeDFS(poly){ const nodes=[{face:0,parent:-1,hinge:null}], seen=new Set([0]);
+  const visit=(ni)=>{ const f=nodes[ni].face, F=poly.F[f]; const cand=F.map((a,i)=>{const b=F[(i+1)%F.length]; return {a,b,g:neighbor(poly,f,a,b)};}).sort((x,y)=>Math.abs(poly.N[x.g].y)-Math.abs(poly.N[y.g].y));
+    for(const c of cand){ if(!seen.has(c.g)){ seen.add(c.g); nodes.push({face:c.g,parent:ni,hinge:[c.a,c.b]}); visit(nodes.length-1);} } };
+  visit(0); return nodes; }
+function treeRandom(poly,seed){ const R=rng(seed), nodes=[{face:0,parent:-1,hinge:null}], seen=new Set([0]); let frontier=[];
+  const push=ni=>{ const f=nodes[ni].face,F=poly.F[f]; F.forEach((a,i)=>{const b=F[(i+1)%F.length]; frontier.push({ni,a,b,g:neighbor(poly,f,a,b)});}); };
+  push(0); while(frontier.length){ const k=Math.floor(R()*frontier.length), c=frontier.splice(k,1)[0]; if(seen.has(c.g)) continue; seen.add(c.g); nodes.push({face:c.g,parent:c.ni,hinge:[c.a,c.b]}); push(nodes.length-1); }
+  return nodes; }
+function freeEdges(poly,nodes){
+  const used=new Set(); nodes.forEach((n,i)=>{ if(n.parent>=0){ used.add(i+':'+ekey(...n.hinge)); used.add(n.parent+':'+ekey(...n.hinge)); } });
+  const out=[]; nodes.forEach((n,i)=>{ const F=poly.F[n.face]; F.forEach((a,k)=>{ const b=F[(k+1)%F.length]; if(!used.has(i+':'+ekey(a,b))) out.push({ni:i,a,b}); }); }); return out;
+}
+function treeWrong(poly,seed){
+  const R=rng(seed*7+3);
+  for(let attempt=0;attempt<40;attempt++){
+    const base= attempt%2? treeDFS(poly): treeBFS(poly);
+    const children=base.map(()=>0); base.forEach(n=>{ if(n.parent>=0) children[n.parent]++; });
+    const leaves=base.map((n,i)=>i).filter(i=>i>0&&children[i]===0);
+    const li=leaves[Math.floor(R()*leaves.length)]; const removed=base[li];
+    const nodes=base.filter((_,i)=>i!==li).map(n=>({...n,parent:n.parent>li?n.parent-1:n.parent}));
+    const fe=freeEdges(poly,nodes).filter(e=>{ const g=neighbor(poly,nodes[e.ni].face,e.a,e.b); return g!==removed.face; });
+    for(let k=0;k<fe.length;k++){ const e=fe[Math.floor(R()*fe.length)]; const g=neighbor(poly,nodes[e.ni].face,e.a,e.b); const cand=nodes.concat([{face:g,parent:e.ni,hinge:[e.a,e.b]}]); const an=analyzeNet(poly,cand); if(an.overlap.size===0) return cand; }
+  }
+  return treeRandom(poly,seed);
+}
+function netAlphas(poly,nodes){ return nodes.map(n=>{ if(n.parent<0) return 0; const a=poly.V[n.hinge[0]], b=poly.V[n.hinge[1]], u=b.clone().sub(a).normalize(), nc=poly.N[n.face], np=poly.N[nodes[n.parent].face]; return Math.atan2(u.dot(nc.clone().cross(np)), nc.dot(np)); }); }
+function netMatrices(poly,nodes,t,alphas){
+  alphas=alphas||netAlphas(poly,nodes);
+  const M=[], dupI=dupIndex(nodes), out=[];
+  nodes.forEach((n,i)=>{
+    if(n.parent<0){ M[i]=new THREE.Matrix4(); }
+    else { const a=poly.V[n.hinge[0]], u=poly.V[n.hinge[1]].clone().sub(a).normalize();
+      const m=new THREE.Matrix4().makeTranslation(a.x,a.y,a.z).multiply(new THREE.Matrix4().makeRotationAxis(u,alphas[i]*(1-t))).multiply(new THREE.Matrix4().makeTranslation(-a.x,-a.y,-a.z));
+      M[i]=M[n.parent].clone().multiply(m); }
+    const d=dupI[i]*SZ*0.035*smooth(.6,1,t), N=poly.N[n.face];
+    out[i]=M[i].clone().multiply(new THREE.Matrix4().makeTranslation(N.x*d,N.y*d,N.z*d));
+  });
+  return out;
+}
+function dupIndex(nodes){ const c={}; return nodes.map(n=>{ c[n.face]=(c[n.face]||0); return c[n.face]++; }); }
+function flatPolys(poly,nodes){ const Ms=netMatrices(poly,nodes,0); return nodes.map((n,i)=>poly.F[n.face].map(vi=>{ const p=poly.V[vi].clone().applyMatrix4(Ms[i]); return [p.x,p.z]; })); }
+function satOverlap(A,B){
+  const shr=P=>{ let cx=0,cy=0; P.forEach(p=>{cx+=p[0];cy+=p[1];}); cx/=P.length; cy/=P.length; return P.map(p=>[cx+(p[0]-cx)*.96, cy+(p[1]-cy)*.96]); };
+  A=shr(A); B=shr(B);
+  for(const P of [A,B]) for(let i=0;i<P.length;i++){ const p=P[i],q=P[(i+1)%P.length], ax=[q[1]-p[1],p[0]-q[0]];
+    let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity; A.forEach(v=>{const d=v[0]*ax[0]+v[1]*ax[1]; a0=Math.min(a0,d); a1=Math.max(a1,d);}); B.forEach(v=>{const d=v[0]*ax[0]+v[1]*ax[1]; b0=Math.min(b0,d); b1=Math.max(b1,d);});
+    if(a1<=b0+1e-9||b1<=a0+1e-9) return false; }
+  return true;
+}
+function analyzeNet(poly,nodes){
+  const fp=flatPolys(poly,nodes), overlap=new Set(), pairs=[];
+  for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++) if(satOverlap(fp[i],fp[j])){ overlap.add(i); overlap.add(j); pairs.push([i,j]); }
+  const cnt={}; nodes.forEach(n=>cnt[n.face]=(cnt[n.face]||0)+1);
+  const dup=new Set(); nodes.forEach((n,i)=>{ if(cnt[n.face]>1) dup.add(i); });
+  const dupFaces=[...new Set(nodes.filter(n=>cnt[n.face]>1).map(n=>n.face))];
+  const missing=poly.F.map((_,f)=>f).filter(f=>!cnt[f]);
+  return {overlap,pairs,dup,dupFaces,missing,ok:!pairs.length&&!dupFaces.length&&!missing.length};
+}
+
+function buildPolyNet(nodes,opts={}){
+  const poly=buildPoly(state.shape,P()); SZ=poly.size;
+  const g=new THREE.Group(); root.add(g);
+  const an=analyzeNet(poly,nodes), alphas=netAlphas(poly,nodes);
+  const groups=nodes.map((n,i)=>{
+    const ng=new THREE.Group(); ng.matrixAutoUpdate=false; g.add(ng);
+    const F=poly.F[n.face], pos=[];
+    for(let k=1;k<F.length-1;k++) [F[0],F[k],F[k+1]].forEach(vi=>{const v=poly.V[vi]; pos.push(v.x,v.y,v.z);});
+    const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.computeVertexNormals();
+    const mat=MAT.netSide.clone(); mat.color.copy(faceColor(poly,n.face)); const mesh=new THREE.Mesh(geo,mat); mesh.userData.ownMat=true; mesh.userData.node=i; mesh.renderOrder=1; ng.add(mesh);
+    F.forEach((a,k)=>addEdge(ng,poly.V[a],poly.V[F[(k+1)%F.length]],{hidden:true}));
+    const marks=new THREE.Group(); ng.add(marks);
+    return {ng,mesh,mat,marks};
+  });
+  // missing faces outline (shown when folded)
+  const missG=new THREE.Group(); g.add(missG);
+  an.missing.forEach(f=>{ const F=poly.F[f], pos=[]; for(let k=1;k<F.length-1;k++) [F[0],F[k],F[k+1]].forEach(vi=>{const v=poly.V[vi]; pos.push(v.x,v.y,v.z);}); const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); const m=new THREE.Mesh(geo,MAT.errFill); m.renderOrder=6; missG.add(m); F.forEach((a,k)=>missG.add(seg(poly.V[a],poly.V[F[(k+1)%F.length]],ER()*1.3,MAT.err,6))); });
+  // corner labels
+  const nlabels=[];
+  if(state.labels){ nodes.forEach((n,i)=>{ const F=poly.F[n.face], c=poly.C[n.face]; F.forEach(vi=>{ const lp=poly.V[vi].clone().lerp(c,.2); const L=addLabel(poly.labels[vi],()=>lp.clone().applyMatrix4(groups[i].ng.matrixWorld),'small'); nlabels.push(L); }); }); }
+  // bbox for framing
+  const box=t=>{ const b=new THREE.Box3(), Ms=netMatrices(poly,nodes,t,alphas); nodes.forEach((n,i)=>poly.F[n.face].forEach(vi=>b.expandByPoint(poly.V[vi].clone().applyMatrix4(Ms[i])))); return b; };
+  const b0=box(0), b1=box(1), c0=b0.getCenter(new V3()), c1=b1.getCenter(new V3()), s0=b0.getSize(new V3()), s1=b1.getSize(new V3());
+  cur={type:'polyNet',poly,nodes,groups,an,alphas,missG,group:g,frame:{c0,c1,d0:state.mode==='build'?Math.max(SZ*7.5,Math.max(s0.x,s0.z)*1.6+SZ):Math.max(s0.x,s0.z,s1.y)*1.7+SZ,d1:SZ*4.3},
+    update(t){ const Ms=netMatrices(poly,nodes,t,alphas); groups.forEach((G,i)=>{ G.ng.matrix.copy(Ms[i]); G.ng.matrixWorldNeedsUpdate=true; });
+      const showErr=state.revealed;
+      groups.forEach((G,i)=>{ const bad=(an.overlap.has(i)&&(!state.quiz||showErr))||(showErr&&an.dup.has(i)); G.mat.color.copy(bad?COL.err:faceColor(poly,nodes[i].face)); G.mat.opacity=bad?.75:.92; });
+      const mo=showErr?smooth(.85,1,t):0; missG.visible=mo>0.01; MAT.errFill.opacity=.28*mo;
+    }};
+  cur.update(state.t);
+  paintNetSel();
+}
+function paintNetSel(){
+  if(!cur||cur.type!=='polyNet') return; const {poly,nodes,groups}=cur; groups.forEach(G=>G.marks.clear());
+  const s=state.sel; if(!s) return; const r=ER()*1.9;
+  if(s.kind==='edge'){ const k=ekey(s.a,s.b); nodes.forEach((n,i)=>{ const F=poly.F[n.face]; F.forEach((a,j)=>{ const b=F[(j+1)%F.length]; if(ekey(a,b)===k) groups[i].marks.add(seg(poly.V[a],poly.V[b],r,MAT.mark,7)); }); }); }
+  if(s.kind==='vertex'){ nodes.forEach((n,i)=>{ if(poly.F[n.face].includes(s.v)) groups[i].marks.add(ball(poly.V[s.v],r*2.2,MAT.mark,7)); }); }
+  if(s.kind==='face'){ const G=groups[s.ni]; G.mat.color.copy(COL.mark); }
+  markDirty();
+}
+
+/* ================= nets (revolution) ================= */
+function revNeed(sh,p){ const {R1,R2,h}=revDims(); if(sh==='cylinder') return {W:TAU*R1}; const l=Math.hypot(h,R1-R2), L=sh==='cone'? l: l*R1/(R1-R2); return {angle:360*R1/L, l, L}; }
+function buildRevNet(user){
+  const sh=state.shape, {R1,R2,h}=revDims(); SZ=Math.hypot(Math.max(R1,R2),h/2);
+  const g=new THREE.Group(); root.add(g); const body=new THREE.Group(); body.matrixAutoUpdate=false; g.add(body);
+  const nu=72, nv=sh==='cylinder'?2:10;
+  const geo=new THREE.BufferGeometry(); const pos=new Float32Array((nu+1)*(nv+1)*3); geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const idx=[]; for(let i=0;i<nu;i++)for(let j=0;j<nv;j++){ const a=i*(nv+1)+j,b=a+1,c=a+nv+1,d=c+1; idx.push(a,c,b,b,c,d);} geo.setIndex(idx);
+  const lat=new THREE.Mesh(geo,MAT.netSide); lat.renderOrder=1; body.add(lat);
+  const seamA=dynLine(body,nv+1,MAT.mark,()=>ER()*1.4), seamB=dynLine(body,nv+1,MAT.mark,()=>ER()*1.4);
+  const arcO=dynLine(body,nu+1,MAT.accent,()=>ER()*1.2), arcI=dynLine(body,nu+1,MAT.accent,()=>ER()*1.2);
+  const baseMat=MAT.netBase.clone(); const mkCircle=(r)=>{ const grp=new THREE.Group(); const c=new THREE.Group(); grp.add(c); const m=new THREE.Mesh(new THREE.CircleGeometry(r,72),baseMat); m.userData.ownMat=true; m.rotation.x=-PI/2; m.renderOrder=1; c.add(m); const cp=circlePts(new V3(),r,72,0); addPolyline(c,cp,true,{mat:MAT.accent,hidden:false,r:ER()*1.2}); body.add(grp); return {grp,c}; };
+  let circles=[], fn, info={};
+  if(sh==='cylinder'){
+    const W=user.W, rc=R1; info={W, need:TAU*rc};
+    const c1=mkCircle(rc), c2=mkCircle(rc); c1.grp.position.set(0,0,h/2); c1.c.position.set(0,0,rc); c2.grp.position.set(0,0,-h/2); c2.c.position.set(0,0,-rc); circles=[c1,c2];
+    fn=(tt)=>{ const s=ease(smooth(0,.65,tt)), cap=ease(smooth(.65,1,tt)), A=s*TAU, Rr=A>1e-5?W/A:0;
+      const P2=(u,z)=> A>1e-5? new V3(Rr*Math.sin(u*A/W), Rr*(1-Math.cos(u*A/W)), z): new V3(u,0,z);
+      for(let i=0;i<=nu;i++){ const u=-W/2+W*i/nu; for(let j=0;j<=nv;j++){ const z=-h/2+h*j/nv, p=P2(u,z), k=(i*(nv+1)+j)*3; pos[k]=p.x;pos[k+1]=p.y;pos[k+2]=p.z; } }
+      const col=(u)=>{ const a=[]; for(let j=0;j<=nv;j++) a.push(P2(u,-h/2+h*j/nv)); return a; };
+      seamA.set(col(-W/2)); seamB.set(col(W/2));
+      const row=(z)=>{ const a=[]; for(let i=0;i<=nu;i++) a.push(P2(-W/2+W*i/nu,z)); return a; };
+      arcO.set(row(h/2)); arcI.set(row(-h/2));
+      c1.grp.rotation.x=-cap*PI/2; c2.grp.rotation.x=cap*PI/2; body.matrix.identity();
+    };
+  } else {
+    const l=Math.hypot(h,R1-R2), L= sh==='cone'? l: l*R1/(R1-R2), Lin= sh==='cone'?0: L-l, Phi=user.angle*PI/180;
+    info={Phi,L,Lin,l};
+    const outer=mkCircle(R1); outer.c.position.set(0,0,R1); circles.push(outer);
+    let inner=null; if(R2>0){ inner=mkCircle(R2); circles.push(inner); }
+    fn=(tt)=>{ const s=ease(smooth(0,.55,tt)), cap=ease(smooth(.55,.8,tt)), fl=ease(smooth(.8,1,tt));
+      const A=Phi+s*(TAU-Phi), sa=Math.min(1,Phi/A), ca=Math.sqrt(Math.max(0,1-sa*sa));
+      const P2=(rho,psi)=>{ const ps=PI/2+psi*A/Phi; return new V3(rho*sa*Math.cos(ps), rho*ca, rho*sa*Math.sin(ps)); };
+      for(let i=0;i<=nu;i++){ const psi=-Phi/2+Phi*i/nu; for(let j=0;j<=nv;j++){ const rho=Lin+(L-Lin)*j/nv, p=P2(rho,psi), k=(i*(nv+1)+j)*3; pos[k]=p.x;pos[k+1]=p.y;pos[k+2]=p.z; } }
+      const rad=(psi)=>{ const a=[]; for(let j=0;j<=nv;j++) a.push(P2(Lin+(L-Lin)*j/nv,psi)); return a; };
+      seamA.set(rad(-Phi/2)); seamB.set(rad(Phi/2));
+      const arc=(rho)=>{ const a=[]; for(let i=0;i<=nu;i++) a.push(P2(rho,-Phi/2+Phi*i/nu)); return a; };
+      arcO.set(arc(L)); if(Lin>0) arcI.set(arc(Lin)); else arcI.set([]);
+      outer.grp.position.set(0,L*ca,L*sa); outer.grp.rotation.x=-cap*PI;
+      if(inner){ inner.grp.position.set(0,Lin*ca,Lin*sa); inner.c.position.set(0,0,-R2); }
+      // flip the funnel onto its base
+      const yp=(L+Lin)*ca/2, fA=fl*PI;
+      body.matrix.makeTranslation(0,yp-Lin*ca*fl,0).multiply(new THREE.Matrix4().makeRotationX(fA)).multiply(new THREE.Matrix4().makeTranslation(0,-yp,0));
+    };
+  }
+  const okNet=revCheck(user).ok; const upd=(tt)=>{ fn(tt); baseMat.color.copy(state.revealed&&!okNet&&tt>.5?COL.err:COL['face-base']); geo.attributes.position.needsUpdate=true; geo.computeVertexNormals(); geo.computeBoundingSphere(); body.matrixWorldNeedsUpdate=true; };
+  const bb=(tt)=>{ upd(tt); g.updateMatrixWorld(true); return new THREE.Box3().setFromObject(g); };
+  const b0=bb(0), b1=bb(1), s0=b0.getSize(new V3()), s1=b1.getSize(new V3());
+  cur={type:'revNet',group:g,info,user,frame:{c0:b0.getCenter(new V3()),c1:b1.getCenter(new V3()),d0:Math.max(s0.x,s0.z)*1.5+SZ,d1:Math.max(s1.x,s1.y,s1.z)*2.4+SZ},update:upd};
+  upd(state.t);
+}
+function revCheck(user){
+  const sh=state.shape, {R1,R2,h}=revDims(), out=[];
+  if(sh==='cylinder'){ const need=TAU*R1, have=user.W, ok=Math.abs(have-need)/need<.015; out.push({ok,text:t('cylNeed',fmt(need),fmt(have))}); if(!ok) out.push({ok:false,text:have<need?t('revShort'):t('revLong')}); else out.push({ok:true,text:t('revOk')}); return {ok,items:out}; }
+  const l=Math.hypot(h,R1-R2), L=sh==='cone'?l:l*R1/(R1-R2), Lin=L-l, Phi=user.angle*PI/180, needA=360*R1/L;
+  const ok=Math.abs(user.angle-needA)/needA<.015;
+  if(sh==='cone') out.push({ok,text:t('coneNeed',fmt(TAU*R1),fmt(Phi*L),fmt(needA))});
+  else out.push({ok,text:t('fconeNeed',fmt(TAU*R1),fmt(TAU*R2),fmt(Phi*L),fmt(Phi*Lin),fmt(needA))});
+  out.push(ok?{ok:true,text:t('revOk')}:{ok:false,text:user.angle<needA?t('revShort'):t('revLong')});
+  return {ok,items:out};
+}
+
+/* ================= build (constructor) ================= */
+function buildKey(){ const p=P(); return state.shape+':'+(p.n||''); }
+function ensureBuild(){ if(state.build.key!==buildKey()){ state.build={key:buildKey(),nodes:[{face:0,parent:-1,hinge:null}],hist:[],folded:false}; } }
+function buildButtons(){
+  if(!cur||cur.type!=='polyNet'||state.mode!=='build'||state.t>0.001||state.anim) return;
+  const {poly,nodes,groups}=cur, fe=freeEdges(poly,nodes);
+  fe.forEach(e=>{ const G=groups[e.ni], c=poly.C[nodes[e.ni].face], mid=poly.V[e.a].clone().add(poly.V[e.b]).multiplyScalar(.5), out=mid.clone().sub(c).setLength(SZ*.1), p=mid.add(out);
+    addLabel('+',()=>p.clone().applyMatrix4(G.ng.matrixWorld),'',{button:true,aria:'+',onClick:()=>{ pushHist(); state.build.nodes.push({face:neighbor(poly,nodes[e.ni].face,e.a,e.b),parent:e.ni,hinge:[e.a,e.b]}); state.build.folded=false; state.revealed=false; state.sel=null; rebuild(); renderModeBits(); }}); });
+  const kids=nodes.map(()=>0); nodes.forEach(n=>{ if(n.parent>=0) kids[n.parent]++; });
+  nodes.forEach((n,i)=>{ if(i===0||kids[i]) return; const G=groups[i], c=poly.C[n.face].clone();
+    addLabel('×',()=>c.clone().applyMatrix4(G.ng.matrixWorld),'del',{button:true,aria:'×',onClick:()=>{ pushHist(); state.build.nodes=state.build.nodes.filter((_,k)=>k!==i).map(m=>({...m,parent:m.parent>i?m.parent-1:m.parent})); state.build.folded=false; state.revealed=false; state.sel=null; rebuild(); renderModeBits(); }}); });
+}
+function pushHist(){ state.build.hist.push(JSON.parse(JSON.stringify(state.build.nodes))); if(state.build.hist.length>60) state.build.hist.shift(); }
+
+/* ================= current net nodes for net mode ================= */
+function netNodes(poly){
+  if(state.quiz&&state.quiz.nodes) return state.quiz.nodes;
+  switch(state.netVariant){ case 'strip': return treeDFS(poly); case 'random': return treeRandom(poly,state.netSeed); case 'wrong': return treeWrong(poly,state.netSeed); default: return treeBFS(poly); }
+}
+function revNetUser(){
+  if(state.quiz&&state.quiz.user) return state.quiz.user;
+  const need=revNeed(state.shape,P());
+  if(state.mode==='build'){ const k=state.shape+':user'; if(!state.revUser[k]){ state.revUser[k]= state.shape==='cylinder'? {W:Math.round(6*P().r*10)/10}: {angle:Math.round(need.angle*0.75)}; } return state.revUser[k]; }
+  if(state.netVariant==='wrong'){ return state.shape==='cylinder'? {W:need.W*0.78}: {angle:Math.min(355,need.angle*1.3)}; }
+  return state.shape==='cylinder'? {W:need.W}: {angle:need.angle};
+}
+
+/* ================= rebuild ================= */
+function rebuild(){
+  clearLabels(); elLabels=[]; disposeRoot(); cur=null;
+  const rev=isRev();
+  if(state.mode==='model'){ rev? buildRevModel(): buildPolyModel(); }
+  else if(rev){ if(state.shape==='sphere'){ buildRevModel(); } else buildRevNet(revNetUser()); }
+  else { const poly=buildPoly(state.shape,P()); SZ=poly.size; let nodes;
+    if(state.mode==='build'){ ensureBuild(); nodes=state.build.nodes; } else nodes=netNodes(poly);
+    buildPolyNet(nodes); buildButtons(); }
+  frame(false); markDirty(); renderInfo();
+}
+let lastFrameKey='';
+function frame(force){
+  // keep the user's camera unless the shape/mode changed
+  const key=state.mode+'|'+state.shape+'|'+(isRev()?'':P().n||'');
+  if(!force && key===lastFrameKey){ followFrame(); return; }
+  lastFrameKey=key;
+  if(cur&&cur.frame){ const f=cur.frame; const tt=ease(state.t); orbit.target.copy(f.c0.clone().lerp(f.c1,tt)); orbit.dist=(f.d0+(f.d1-f.d0)*tt)*aspK(); orbit.theta=.35; orbit.phi=state.t<.5? (state.mode==='build'?.42:.62): 1.1; }
+  else { orbit.target.set(0,0,0); orbit.dist=SZ*3.6*aspK(); orbit.theta=.62; orbit.phi=1.12; }
+  orbit.tween=null; applyCam();
+}
+function aspK(){ const a=camera.aspect||1; return a<1.15? Math.pow(1.15/a,.9): 1; }
+function followFrame(){ if(cur&&cur.frame&&state.mode!=='model'){ const f=cur.frame, tt=ease(state.t); orbit.target.copy(f.c0.clone().lerp(f.c1,tt)); } }
+
+/* ================= picking ================= */
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
+function pick(cx,cy){
+  const r=renderer.domElement.getBoundingClientRect(); ndc.set(((cx-r.left)/r.width)*2-1, -((cy-r.top)/r.height)*2+1); ray.setFromCamera(ndc,camera);
+  if(!cur) return;
+  if(cur.type==='polyModel'){
+    const hit=ray.intersectObject(cur.mesh)[0]; if(!hit){ state.sel=null; applyElement(); renderInfo(); return; }
+    const f=cur.triFace[hit.faceIndex], {poly}=cur, p=hit.point; state.sel=selFromPoint(poly,f,p); state.element=null; applyElement(); renderInfo(); renderPanelElements();
+  } else if(cur.type==='polyNet'){
+    const meshes=cur.groups.map(G=>G.mesh), hit=ray.intersectObjects(meshes)[0];
+    if(!hit){ state.sel=null; cur.update(state.t); paintNetSel(); renderInfo(); return; }
+    const ni=hit.object.userData.node, G=cur.groups[ni], local=hit.point.clone().applyMatrix4(new THREE.Matrix4().copy(G.ng.matrixWorld).invert());
+    const s=selFromPoint(cur.poly,cur.nodes[ni].face,local); s.ni=ni; state.sel=s; cur.update(state.t); paintNetSel(); renderInfo();
+  } else if(cur.type==='revModel'){
+    const hit=ray.intersectObjects(cur.pick)[0]; state.sel= hit? {kind:'part',part:hit.object.userData.part}: null; renderInfo();
+  }
+}
+function selFromPoint(poly,f,p){
+  const F=poly.F[f]; let best=null,bd=Infinity;
+  F.forEach(vi=>{ const d=poly.V[vi].distanceTo(p); if(d<bd){bd=d;best=vi;} });
+  if(bd<SZ*.16) return {kind:'vertex',v:best,f};
+  let be=null; bd=Infinity; const line=new THREE.Line3(), cp=new V3();
+  F.forEach((a,i)=>{ const b=F[(i+1)%F.length]; line.set(poly.V[a],poly.V[b]); line.closestPointToPoint(p,true,cp); const d=cp.distanceTo(p); if(d<bd){bd=d;be=[a,b];} });
+  if(bd<SZ*.09) return {kind:'edge',a:be[0],b:be[1],f};
+  return {kind:'face',f};
+}
+
+/* ================= info card ================= */
+const vbottom=$('#vbottom');
+let infoEl=null, foldEl=null, quizEl=null;
+function renderInfo(){
+  if(infoEl){ infoEl.remove(); infoEl=null; }
+  const s=state.sel; if(!s||!cur) return;
+  let title='',detail='';
+  if(cur.type==='polyModel'){ const {poly}=cur, p=P();
+    if(s.kind==='face'){ title=`${t(faceKind(poly,s.f))} ${faceName(poly,s.f)}`; detail=`${polyShapeName(poly,s.f,p)} · ${t('areaW')} ≈ ${fmt(poly.area[s.f])} ${t('cm')}²`; }
+    if(s.kind==='edge'){ title=`${t(edgeKind(poly,s.a,s.b))} ${poly.labels[s.a]}${poly.labels[s.b]}`; detail=`${t('length')} ≈ ${fmt(poly.V[s.a].distanceTo(poly.V[s.b]))} ${t('cm')}`; }
+    if(s.kind==='vertex'){ title=`${t(poly.labels[s.v]==='S'?'eApex':'eVertex')} ${poly.labels[s.v]}`; detail=`${t('meet')}: ${poly.deg[s.v]}`; }
+  } else if(cur.type==='polyNet'){ const {poly,nodes}=cur;
+    if(s.kind==='edge'){ const k=ekey(s.a,s.b), nm=poly.labels[s.a]+poly.labels[s.b]; const hinge=nodes.some(n=>n.hinge&&ekey(...n.hinge)===k); title= hinge? t('hingeEdge',nm): t('glueEdge',nm); detail=`${t('length')} ≈ ${fmt(poly.V[s.a].distanceTo(poly.V[s.b]))} ${t('cm')}`; }
+    if(s.kind==='vertex'){ const c=nodes.filter(n=>poly.F[n.face].includes(s.v)).length; title= c>1? t('glueVert',c,poly.labels[s.v]): t('glueVert1',poly.labels[s.v]); detail=''; }
+    if(s.kind==='face'){ title=t('netFace',faceName(poly,s.f)); detail=`${t(faceKind(poly,s.f))} · ${polyShapeName(poly,s.f,P())} · ${t('areaW')} ≈ ${fmt(poly.area[s.f])} ${t('cm')}²`; }
+  } else if(cur.type==='revModel'){ const sh=state.shape, p=P();
+    title=t(s.part); const {R1,R2,h}=revDims(); let A=0;
+    if(sh==='sphere') A=4*PI*p.r*p.r; else if(s.part==='eBase') A=PI*R1*R1; else if(s.part==='eTop') A=PI*R2*R2; else { const l=Math.hypot(h,R1-R2); A= sh==='cylinder'? TAU*R1*h: PI*(R1+R2)*l; }
+    detail=`${t('areaW')} ≈ ${fmt(A)} ${t('cm')}²`;
+  }
+  if(!title) return;
+  infoEl=document.createElement('div'); infoEl.className='card info'; infoEl.setAttribute('role','status');
+  infoEl.innerHTML=`<i class="sw"></i><div><b></b><span></span></div><button class="x" aria-label="${t('closeQ')}">×</button>`;
+  infoEl.querySelector('b').textContent=title; infoEl.querySelector('span').textContent=detail;
+  infoEl.querySelector('.x').onclick=()=>{ state.sel=null; if(cur.type==='polyNet'){cur.update(state.t); paintNetSel();} else applyElement(); renderInfo(); };
+  vbottom.prepend(infoEl);
+}
+
+/* ================= fold bar & animation ================= */
+function renderFoldBar(){
+  if(foldEl){ foldEl.remove(); foldEl=null; }
+  if(state.mode==='model'||state.shape==='sphere') return;
+  foldEl=document.createElement('div'); foldEl.className='card fold';
+  foldEl.innerHTML=`<button class="play" id="playBtn"></button><input type="range" id="foldR" min="0" max="1000" aria-label="${t('fold')}"><div class="ends"><span>${t('flat')}</span><span>↔ ${t('solid')}</span></div>`;
+  vbottom.appendChild(foldEl);
+  const r=$('#foldR',foldEl); r.value=Math.round(state.t*1000);
+  r.addEventListener('input',()=>{ state.anim=null; setT(r.value/1000); if(state.t>.97) reveal(); });
+  $('#playBtn',foldEl).onclick=()=>{ if(state.quiz&&state.quiz.answer==null) return; playFold(state.t<.5?1:0); };
+  syncFoldBar();
+}
+function syncFoldBar(){ if(!foldEl) return; const b=$('#playBtn',foldEl), r=$('#foldR',foldEl); const target=state.anim?state.anim.to:(state.t<.5?1:0); b.textContent= target===1? '▶ '+t('fold'): '↺ '+t('unfold'); if(state.anim) b.textContent=(state.anim.to===1?'▶ ':'↺ ')+(state.anim.to===1?t('fold'):t('unfold')); r.value=Math.round(state.t*1000); b.disabled=!!(state.quiz&&state.quiz.answer==null); }
+function setT(v){ const was=state.t; state.t=v; if(cur&&cur.update&&cur.type!=='revModel') cur.update(v); followFrame();
+  if((was<=0.001)!==(v<=0.001)&&state.mode==='build'){ clearHButtons(); if(v<=0.001) buildButtons(); }
+  markDirty(); syncFoldBar(); }
+function clearHButtons(){ labels=labels.filter(l=>{ if(l.el.classList.contains('hbtn')){ l.el.remove(); return false;} return true; }); }
+function playFold(to,cb){ const from=state.t; const dist=Math.abs(to-from); if(dist<1e-3){ if(to===1) reveal(); cb&&cb(); return; }
+  state.anim={from,to,start:performance.now(),ms:(isRev()?3200:2400)*dist,cb}; clearHButtons();
+  const d1=cur&&cur.frame? cur.frame.d1: orbit.dist, d0=cur&&cur.frame?cur.frame.d0:orbit.dist;
+  camTo(to===1?.55:.35, to===1?1.08:(state.mode==='build'?.42:.62), (to===1?d1:d0)*aspK(), null, Math.min(1400,state.anim.ms)); syncFoldBar(); }
+function reveal(){ if(!state.revealed){ state.revealed=true; if(cur&&cur.update&&cur.type!=='revModel') cur.update(state.t); markDirty(); renderModeBits(); } }
+
+/* ================= quiz ================= */
+function startQuiz(){
+  const R=Math.random(); state.sel=null;
+  if(isRev()){ const need=revNeed(state.shape,P()); const good=R<.5; const f=Math.random()<.5?.75:1.3;
+    const user= state.shape==='cylinder'? {W: good?need.W: need.W*f}: {angle: good?need.angle: Math.min(355,need.angle*f)};
+    state.quiz={user,good,answer:null};
+  } else { const poly=buildPoly(state.shape,P()); let nodes; const r=Math.random();
+    if(r<.25) nodes=treeBFS(poly); else if(r<.4) nodes=treeDFS(poly); else if(r<.6) nodes=treeRandom(poly,Math.floor(Math.random()*1e6)); else nodes=treeWrong(poly,Math.floor(Math.random()*1e6));
+    state.quiz={nodes,good:analyzeNet(poly,nodes).ok,answer:null}; }
+  state.t=0; state.anim=null; state.revealed=false; rebuild(); frame(true); renderModeBits();
+}
+function renderQuiz(){
+  if(quizEl){ quizEl.remove(); quizEl=null; }
+  const q=state.quiz; if(!q||state.mode!=='net') return;
+  quizEl=document.createElement('div'); quizEl.className='card quiz';
+  if(q.answer==null){
+    quizEl.innerHTML=`<p></p><div class="row"><button class="btn pri" data-a="1"></button><button class="btn" data-a="0"></button></div>`;
+    quizEl.querySelector('p').textContent=t('quizQ',t(state.shape)); quizEl.querySelector('[data-a="1"]').textContent=t('yes'); quizEl.querySelector('[data-a="0"]').textContent=t('no');
+    quizEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{ q.answer=b.dataset.a==='1'; renderQuiz(); syncFoldBar(); playFold(1,()=>{ renderQuiz(); }); });
+  } else {
+    const right=q.answer===q.good, done=state.t>.99;
+    quizEl.innerHTML=`<p class="res ${right?'good':'bad'}"></p><div class="row"><button class="btn pri" data-n></button><button class="btn" data-c></button></div>`;
+    let why=''; if(done){ if(isRev()){ why=revCheck(revNetUser()).items[0].text; } else if(cur&&cur.an){ const {an,poly}=cur; why= an.ok? t('gOk'): an.pairs.length? t('gOverlap',faceName(poly,cur.nodes[an.pairs[0][0]].face)+' / '+faceName(poly,cur.nodes[an.pairs[0][1]].face)): an.dupFaces.length? t('gDup',an.dupFaces.map(f=>faceName(poly,f)).join(', ')): t('gMiss',an.missing.map(f=>faceName(poly,f)).join(', ')); } }
+    quizEl.querySelector('p').textContent=(right?t('right'):t('wrongA'))+' '+(done? why: '…');
+    quizEl.querySelector('[data-n]').textContent=t('nextQ'); quizEl.querySelector('[data-c]').textContent=t('closeQ');
+    quizEl.querySelector('[data-n]').onclick=startQuiz; quizEl.querySelector('[data-c]').onclick=()=>{ state.quiz=null; state.revealed=false; rebuild(); renderModeBits(); };
+  }
+  vbottom.prepend(quizEl);
+}
+
+/* ================= pointer controls ================= */
+const ptrs=new Map(); let downAt=null, moved=0, pinch0=0, dist0=0, hintGone=false;
+const cv=renderer.domElement;
+function killHint(){ if(!hintGone){ hintGone=true; $('#hint').classList.add('gone'); } }
+cv.addEventListener('pointerdown',e=>{ cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); orbit.tween=null; orbit.vt=orbit.vp=0;
+  if(ptrs.size===1){ downAt={x:e.clientX,y:e.clientY,t:performance.now()}; moved=0; } else if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); dist0=orbit.dist; moved=99; } });
+cv.addEventListener('pointermove',e=>{ const p=ptrs.get(e.pointerId); if(!p) return; const dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY;
+  if(ptrs.size===1){ moved+=Math.abs(dx)+Math.abs(dy); const k=Math.PI/ Math.max(320, view.clientHeight); orbit.theta-=dx*k*1.6; orbit.phi=clamp(orbit.phi-dy*k*1.6,.04,PI-.04); orbit.vt=-dx*k*1.6; orbit.vp=-dy*k*1.6; if(moved>6) killHint(); }
+  else if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if(pinch0>0) orbit.dist=clamp(dist0*pinch0/d,SZ*1.2,SZ*40); killHint(); }
+  applyCam(); markDirty(); });
+const up=e=>{ if(!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId); if(ptrs.size===0&&downAt&&moved<7&&performance.now()-downAt.t<600){ orbit.vt=orbit.vp=0; pick(e.clientX,e.clientY); markDirty(); } if(ptrs.size<2) pinch0=0; if(ptrs.size===1){ moved=99; } };
+cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{ e.preventDefault(); orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*0.0012),SZ*1.2,SZ*40); orbit.tween=null; applyCam(); markDirty(); killHint(); },{passive:false});
+
+/* ================= view tools ================= */
+const ICON={
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+  reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>',
+  spin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="9" ry="4"/><path d="M18 7.5l3 1.3-1.2 3"/></svg>',
+};
+function renderVTools(){
+  const v=$('#vtools');
+  v.innerHTML=`<button class="vbtn" data-z="in" aria-label="${t('zoomIn')}" title="${t('zoomIn')}">${ICON.plus}</button><button class="vbtn" data-z="out" aria-label="${t('zoomOut')}" title="${t('zoomOut')}">${ICON.minus}</button><button class="vbtn" data-z="reset" aria-label="${t('reset')}" title="${t('reset')}">${ICON.reset}</button><button class="vbtn" id="spinBtn" aria-pressed="${state.autorotate}" aria-label="${t('autorotate')}" title="${t('autorotate')}">${ICON.spin}</button><div class="vgap"></div>
+  <button class="vbtn" data-v="3d">${t('v3d')}</button><button class="vbtn" data-v="front">${t('vFront')}</button><button class="vbtn" data-v="top">${t('vTop')}</button><button class="vbtn" data-v="side">${t('vSide')}</button>`;
+  v.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{ const z=b.dataset.z; if(z==='in') camTo(orbit.theta,orbit.phi,clamp(orbit.dist/1.3,SZ*1.2,SZ*40),null,250); else if(z==='out') camTo(orbit.theta,orbit.phi,clamp(orbit.dist*1.3,SZ*1.2,SZ*40),null,250); else { lastFrameKey=''; frame(true); markDirty(); } });
+  $('#spinBtn').onclick=()=>{ state.autorotate=!state.autorotate; $('#spinBtn').setAttribute('aria-pressed',state.autorotate); const sw=$('#sw-rot'); if(sw) sw.checked=state.autorotate; };
+  v.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ const k=b.dataset.v; const m={ '3d':[.62,1.12], front:[0,PI/2], top:[0,.0001], side:[PI/2,PI/2] }[k]; camTo(m[0],m[1]); });
+}
+
+/* ================= panel ================= */
+const panel=$('#panel');
+function chip(id,pressed,label,extra=''){ return `<button class="chip ${extra}" data-id="${id}" aria-pressed="${pressed}">${label}</button>`; }
+function renderPanel(){
+  const sh=state.shape, p=P();
+  const shapeChips=list=>list.map(k=>chip(k,k===sh,t(k))).join('');
+  let html=`<section class="sec"><h2>${t('shapes')}</h2><div class="sub">${t('polyGroup')}</div><div class="chips" id="shapes1">${shapeChips(POLY_ORDER)}</div><div class="sub">${t('revGroup')}</div><div class="chips" id="shapes2">${shapeChips(REV_ORDER)}</div></section>`;
+  html+=`<section class="sec"><h2>${t('params')}</h2>${SHAPES[sh].params.map(k=>paramHTML(sh,k,p)).join('')}</section>`;
+  html+=`<div id="modeBits"></div>`;
+  html+=`<section class="sec"><p class="about">${t('about')}</p></section>`;
+  panel.innerHTML=html;
+  panel.querySelectorAll('#shapes1 .chip,#shapes2 .chip').forEach(b=>b.onclick=()=>selectShape(b.dataset.id));
+  bindParams();
+  renderModeBits();
+}
+function paramHTML(sh,k,p){ const d=paramDef(sh,k,p), v=clamp(p[k],d.min,d.max); p[k]=v;
+  return `<div class="param"><label for="p-${k}">${d.label}, <i>${d.sym}</i></label><output id="o-${k}">${fmt(v)}${d.unit?' '+d.unit:''}</output><div class="row"><button class="step" data-k="${k}" data-s="-1" aria-label="−">−</button><input type="range" id="p-${k}" data-k="${k}" min="${d.min}" max="${d.max}" step="${d.step}" value="${v}"><button class="step" data-k="${k}" data-s="1" aria-label="+">+</button></div></div>`; }
+let rebuildQueued=false;
+function queueRebuild(){ if(rebuildQueued) return; rebuildQueued=true; requestAnimationFrame(()=>{ rebuildQueued=false; state.quiz=null; rebuild(); renderModeBits(true); }); }
+function bindParams(scope=panel){
+  scope.querySelectorAll('input[type=range][data-k]').forEach(inp=>inp.addEventListener('input',()=>setParam(inp.dataset.k,parseFloat(inp.value))));
+  scope.querySelectorAll('.step[data-k]').forEach(b=>b.onclick=()=>{ const k=b.dataset.k, d=paramDef(state.shape,k,P()); setParam(k,clamp(P()[k]+d.step*(+b.dataset.s),d.min,d.max)); });
+}
+function setParam(k,v){
+  const p=P(), d=paramDef(state.shape,k,p); p[k]=clamp(v,d.min,d.max);
+  // dependent limits
+  ['a2','r2'].forEach(dep=>{ if(dep in p && SHAPES[state.shape].params.includes(dep)){ const dd=paramDef(state.shape,dep,p); if(p[dep]>dd.max) p[dep]=dd.max; const inp=$('#p-'+dep); if(inp){ inp.max=dd.max; inp.value=p[dep]; $('#o-'+dep).textContent=fmt(p[dep])+' '+dd.unit; } } });
+  const inp=$('#p-'+k); if(inp) inp.value=p[k]; $('#o-'+k).textContent=fmt(p[k])+(d.unit?' '+d.unit:'');
+  state.sel=null; queueRebuild();
+}
+function selectShape(id){ if(id===state.shape) return; state.shape=id; state.element=null; state.sel=null; state.quiz=null; state.t=0; state.anim=null; state.revealed=false; if(state.netVariant==='strip'&&isRev()) state.netVariant='bfs'; if(state.netVariant==='random'&&isRev()) state.netVariant='bfs'; rebuild(); renderAll(); }
+
+function renderModeBits(light){
+  const box=$('#modeBits'); if(!box) return; const sh=state.shape, rev=isRev();
+  let h='';
+  if(state.mode==='model'){
+    const els=elementsList();
+    h+=`<section class="sec"><h2>${t('elements')}</h2><div class="chips" id="elChips">${els.map(e=>chip(e.uid,state.element===e.uid,`${t(e.id)}${e.name?` <span class="sym">${e.name}</span>`:''}`,'mk')).join('')}</div><p class="note">${t('elHint')}</p></section>`;
+    h+=`<section class="sec"><h2>${t('area')}</h2><div class="sheet">${areaRows(sh,P()).map(r=>`<div class="r${r.total?' total':''}"><span class="k">${r.k}</span><span class="f">${r.f}</span></div>`).join('')}</div></section>`;
+    if(!rev){ const poly=cur&&cur.poly||buildPoly(sh,P()); const v=poly.V.length,e=poly.edges.size,f=poly.F.length;
+      h+=`<section class="sec"><h2>${t('counts')}</h2><div class="counts"><div><b>${v}</b><span>${t('cV')}</span></div><div><b>${e}</b><span>${t('cE')}</span></div><div><b>${f}</b><span>${t('cF')}</span></div></div><div class="euler">${t('eulerL')} = ${v} − ${e} + ${f} = ${v-e+f}</div></section>`; }
+    h+=`<section class="sec"><h2>${t('display')}</h2>${swRow('sw-lab',t('showLabels'),state.labels)}${swRow('sw-tr',t('transparent'),state.transparent)}${swRow('sw-rot',t('autorotate'),state.autorotate)}</section>`;
+  } else if(sh==='sphere'){
+    h+=`<section class="sec"><h2>${t('tabNet')}</h2><p class="note">${t('noNet')}</p></section>`;
+  } else if(state.mode==='net'){
+    const vs= rev? [['bfs','vRight'],['wrong','vWrong']]: [['bfs','vBfs'],['strip','vStrip'],['random','vRandom'],['wrong','vWrong']];
+    h+=`<section class="sec"><h2>${t('variants')}</h2><div class="chips" id="varChips">${vs.map(([k,l])=>chip(k,state.netVariant===k&&!state.quiz,t(l))).join('')}</div>${(state.netVariant==='random'||state.netVariant==='wrong')&&!state.quiz&&!rev?`<div class="btns"><button class="btn" id="anotherBtn">↻ ${t('vAnother')}</button></div>`:''}</section>`;
+    h+=`<section class="sec"><h2>${t('check')}</h2>${checksHTML()}<div class="btns"><button class="btn pri" id="quizBtn">${t('quiz')}</button><button class="btn" id="printBtn">${t('printBtn')}</button></div></section>`;
+    h+=`<section class="sec">${rev? legendHTML(): `<p class="note">${t('glueHint')}</p>`}</section>`;
+  } else {
+    if(rev){ const u=revNetUser(), need=revNeed(sh,P());
+      const ctrl= sh==='cylinder'? {k:'W',label:t('pW'),min:Math.round(need.W*.5),max:Math.round(need.W*1.5),step:.1,v:u.W,unit:t('cm')}: {k:'angle',label:t('pAng'),min:10,max:359,step:1,v:u.angle,unit:'°'};
+      h+=`<section class="sec"><h2>${t('yourNet')}</h2><p class="note">${t('revTask')}</p><div class="param"><label for="u-${ctrl.k}">${ctrl.label}</label><output id="uo">${fmt(ctrl.v)} ${ctrl.unit}</output><div class="row"><button class="step" data-u="-1">−</button><input type="range" id="u-${ctrl.k}" min="${ctrl.min}" max="${ctrl.max}" step="${ctrl.step}" value="${ctrl.v}"><button class="step" data-u="1">+</button></div></div></section>`;
+      h+=`<section class="sec"><h2>${t('check')}</h2>${checksHTML()}<div class="btns"><button class="btn" id="printBtn">${t('printBtn')}</button></div></section><section class="sec">${legendHTML()}</section>`;
+    } else { const poly=cur&&cur.poly||buildPoly(sh,P()), n=state.build.nodes?state.build.nodes.length:1, F=poly.F.length;
+      h+=`<section class="sec"><h2>${t('yourNet')}</h2><p class="note">${t('buildHint')}</p><div class="sub">${t('gFaces',n,F)}</div><div class="prog"><i style="width:${Math.min(100,n/F*100)}%"></i></div><div class="btns"><button class="btn" id="undoBtn" ${state.build.hist.length?'':'disabled'}>↶ ${t('undo')}</button><button class="btn" id="clearBtn">${t('clear')}</button><button class="btn" id="autoBtn">${t('autofill')}</button></div></section>`;
+      h+=`<section class="sec"><h2>${t('check')}</h2>${checksHTML()}<div class="btns"><button class="btn" id="printBtn">${t('printBtn')}</button></div></section><section class="sec"><p class="note">${t('glueHint')}</p></section>`;
+    }
+  }
+  box.innerHTML=h;
+  // bind
+  box.querySelectorAll('#elChips .chip').forEach(b=>b.onclick=()=>{ state.element= state.element===b.dataset.id? null: b.dataset.id; state.sel=null; renderInfo(); applyElement(); renderPanelElements(); });
+  const sw=(id,fn)=>{ const e=$('#'+id); if(e) e.onchange=()=>fn(e.checked); };
+  sw('sw-lab',v=>{ state.labels=v; rebuild(); }); sw('sw-tr',v=>{ state.transparent=v; paintMats(); markDirty(); }); sw('sw-rot',v=>{ state.autorotate=v; const b=$('#spinBtn'); if(b) b.setAttribute('aria-pressed',v); });
+  box.querySelectorAll('#varChips .chip').forEach(b=>b.onclick=()=>{ state.quiz=null; state.netVariant=b.dataset.id; state.t=0; state.anim=null; state.revealed=false; state.sel=null; rebuild(); frame(true); renderModeBits(); renderQuiz(); syncFoldBar(); });
+  const on=(id,fn)=>{ const e=$('#'+id); if(e) e.onclick=fn; };
+  on('anotherBtn',()=>{ state.netSeed=Math.floor(Math.random()*1e6); state.t=0; state.revealed=false; state.sel=null; rebuild(); frame(true); renderModeBits(); syncFoldBar(); });
+  on('quizBtn',startQuiz);
+  on('printBtn',openPrint);
+  on('undoBtn',()=>{ const h0=state.build.hist.pop(); if(h0){ state.build.nodes=h0; state.revealed=false; state.t=0; state.sel=null; rebuild(); renderModeBits(); syncFoldBar(); } });
+  on('clearBtn',()=>{ pushHist(); state.build.nodes=[{face:0,parent:-1,hinge:null}]; state.revealed=false; state.t=0; state.sel=null; rebuild(); renderModeBits(); syncFoldBar(); });
+  on('autoBtn',()=>{ pushHist(); const poly=buildPoly(state.shape,P()); state.build.nodes=treeBFS(poly); state.revealed=false; state.t=0; state.sel=null; rebuild(); renderModeBits(); syncFoldBar(); });
+  const ui=box.querySelector('input[id^="u-"]');
+  if(ui){ const k=ui.id.slice(2); const setU=v=>{ const u=revNetUser(); u[k]=clamp(v,+ui.min,+ui.max); ui.value=u[k]; $('#uo').textContent=fmt(u[k])+' '+(k==='W'?t('cm'):'°'); state.revealed=false; rebuild(); const c=$('#checksBox'); if(c) c.outerHTML=checksHTML(); };
+    ui.addEventListener('input',()=>setU(parseFloat(ui.value))); box.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>setU(parseFloat(ui.value)+(+b.dataset.u)*(+ui.step))); }
+  renderQuiz();
+}
+function renderPanelElements(){ document.querySelectorAll('#elChips .chip').forEach(b=>b.setAttribute('aria-pressed',state.element===b.dataset.id)); }
+function swRow(id,label,v){ return `<label class="sw-row" for="${id}"><span>${label}</span><input type="checkbox" class="switch" id="${id}" ${v?'checked':''}></label>`; }
+function legendHTML(){ return `<div class="legend"><span><i style="background:var(--mark)"></i>${t('legendSeam')}</span><span><i style="background:var(--accent)"></i>${t('legendArc')}</span></div>`; }
+function checksHTML(){
+  const li=(cls,icon,text)=>`<li class="${cls}"><i>${icon}</i><span>${text}</span></li>`;
+  let items=[];
+  if(isRev()){ if(state.quiz&&state.quiz.answer==null) return `<ul class="checks" id="checksBox">${li('wait','?',t('gFoldFirst'))}</ul>`;
+    const c=revCheck(revNetUser()); items=c.items.map(x=>li(x.ok?'ok':'bad',x.ok?'✓':'✗',x.text)); return `<ul class="checks" id="checksBox">${items.join('')}</ul>`; }
+  if(!cur||cur.type!=='polyNet') return '';
+  const {an,poly,nodes}=cur, F=poly.F.length;
+  if(state.quiz&&state.quiz.answer==null) return `<ul class="checks" id="checksBox">${li('wait','?',t('gFoldFirst'))}</ul>`;
+  items.push(li(nodes.length===F?'ok':'bad',nodes.length===F?'✓':'✗',t('gFaces',nodes.length,F)));
+  if(an.pairs.length) items.push(li('bad','✗',t('gOverlap',an.pairs.slice(0,3).map(([i,j])=>faceName(poly,nodes[i].face)+' / '+faceName(poly,nodes[j].face)).join(', '))));
+  else items.push(li('ok','✓',t('gNoOverlap')));
+  if(!state.revealed) items.push(li('wait','…',t('gFoldFirst')));
+  else { if(an.dupFaces.length) items.push(li('bad','✗',t('gDup',an.dupFaces.map(f=>faceName(poly,f)).join(', '))));
+    if(an.missing.length) items.push(li('bad','✗',t('gMiss',an.missing.map(f=>faceName(poly,f)).join(', '))));
+    if(an.ok) items.push(li('ok','✓',state.mode==='build'?t('done'):t('gOk'))); }
+  return `<ul class="checks" id="checksBox">${items.join('')}</ul>`;
+}
+
+/* ================= header / tabs ================= */
+function renderTabs(){
+  const tabs=[['model','tabModel'],['net','tabNet'],['build','tabBuild']];
+  $('#tabs').innerHTML=tabs.map(([k,l])=>`<button class="tab" role="tab" data-m="${k}" aria-selected="${state.mode===k}"><span class="tl">${t(l)}</span><span class="ts">${k==='model'?'3D':t(l)}</span></button>`).join('');
+  $('#tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+  $('#lang-ru').setAttribute('aria-pressed',lang==='ru'); $('#lang-kz').setAttribute('aria-pressed',lang==='kz');
+  document.documentElement.lang= lang==='kz'?'kk':'ru';
+  $('#vMode').textContent=t(state.mode==='model'?'modeModel':state.mode==='net'?'modeNet':'modeBuild');
+  $('#vName').textContent=t(state.shape);
+  $('#hint').textContent=t('hint');
+}
+function setMode(m,fromHash){
+  if(!['model','net','build'].includes(m)) m='model';
+  if(m===state.mode&&!fromHash) return;
+  state.mode=m; state.sel=null; state.quiz=null; state.anim=null; state.revealed=false; state.t= 0;
+  if(m==='build'&&!isRev()){ ensureBuild(); }
+  try{ if(location.hash!=='#'+m) history.replaceState(null,'','#'+m); }catch(e){}
+  rebuild(); renderAll(); frame(true);
+}
+function renderAll(){ renderTabs(); renderVTools(); renderPanel(); renderFoldBar(); renderInfo(); renderQuiz(); }
+document.querySelectorAll('.lang button').forEach(b=>b.onclick=()=>{ lang=b.dataset.lang; ls.set('gran.lang',lang); rebuild(); renderAll(); });
+window.addEventListener('hashchange',()=>{ const m=location.hash.slice(1); if(m&&m!==state.mode) setMode(m,true); });
+
+/* ================= print / SVG ================= */
+let printScale=1;
+function netSVG(scale){
+  const parts=[]; let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  const ext=(x,y)=>{minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);};
+  const S=scale, f=n=>(+n).toFixed(3), cut='stroke="#111" stroke-width="0.025" fill="none"', foldS='stroke="#111" stroke-width="0.02" stroke-dasharray="0.25 0.15" fill="none"', tabF='fill="#e6e8ee" stroke="#111" stroke-width="0.02"';
+  const tab=(p,q,cx,cy,depth)=>{ const L=Math.hypot(q[0]-p[0],q[1]-p[1]); if(L<1e-6) return; const ux=(q[0]-p[0])/L, uy=(q[1]-p[1])/L; let nx=-uy, ny=ux; const mx=(p[0]+q[0])/2, my=(p[1]+q[1])/2; if((mx-cx)*nx+(my-cy)*ny<0){nx=-nx;ny=-ny;} const d=Math.min(depth,L*.35), ins=Math.min(d,L*.3);
+    const pts=[p,q,[q[0]-ux*ins+nx*d,q[1]-uy*ins+ny*d],[p[0]+ux*ins+nx*d,p[1]+uy*ins+ny*d]]; pts.forEach(v=>ext(v[0],v[1])); parts.push(`<polygon points="${pts.map(v=>f(v[0])+','+f(v[1])).join(' ')}" ${tabF}/>`); };
+  let title=t(state.shape);
+  if(!isRev()){
+    if(!cur||cur.type!=='polyNet') return null;
+    const {poly,nodes}=cur, fp=flatPolys(poly,nodes).map(P=>P.map(([x,y])=>[x*S,y*S]));
+    const hinge=new Set(); nodes.forEach((n,i)=>{ if(n.parent>=0) hinge.add(i+':'+ekey(...n.hinge)), hinge.add(n.parent+':'+ekey(...n.hinge)); });
+    const tabbed=new Set(), depth=Math.max(.5,Math.min(.9,SZ*S*.15));
+    nodes.forEach((n,i)=>{ const F=poly.F[n.face], P=fp[i]; const cx=P.reduce((s,v)=>s+v[0],0)/P.length, cy=P.reduce((s,v)=>s+v[1],0)/P.length;
+      F.forEach((a,k)=>{ const b=F[(k+1)%F.length], key=ekey(a,b); if(hinge.has(i+':'+key)) return; if(!tabbed.has(key)){ tabbed.add(key); tab(P[k],P[(k+1)%F.length],cx,cy,depth); } }); });
+    nodes.forEach((n,i)=>{ const P=fp[i]; P.forEach(v=>ext(v[0],v[1])); parts.push(`<polygon points="${P.map(v=>f(v[0])+','+f(v[1])).join(' ')}" fill="#fff" stroke="none"/>`); });
+    nodes.forEach((n,i)=>{ const F=poly.F[n.face], P=fp[i]; F.forEach((a,k)=>{ const b=F[(k+1)%F.length], p=P[k], q=P[(k+1)%F.length]; const isH=hinge.has(i+':'+ekey(a,b)); if(isH && !(n.parent>=0 && ekey(...n.hinge)===ekey(a,b))) return; parts.push(`<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(q[0])}" y2="${f(q[1])}" ${isH?foldS:cut}/>`); }); });
+    // fold lines from tabs side are cut lines already; mark tab hinges as fold
+    nodes.forEach((n,i)=>{ const F=poly.F[n.face], P=fp[i], cx=P.reduce((s,v)=>s+v[0],0)/P.length, cy=P.reduce((s,v)=>s+v[1],0)/P.length; F.forEach((vi,k)=>{ const x=P[k][0]+(cx-P[k][0])*.16, y=P[k][1]+(cy-P[k][1])*.16; parts.push(`<text x="${f(x)}" y="${f(y)}" font-size="${f(Math.max(.28,Math.min(.45,SZ*S*.07)))}" fill="#7a8190" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">${poly.labels[vi]}</text>`); }); });
+  } else {
+    if(state.shape==='sphere') return null;
+    const {R1,R2,h}=revDims(), u=revNetUser(), r1=R1*S, r2=R2*S, H=h*S;
+    const teeth=(cx,cy,r,skipAng)=>{ const n=Math.max(8,Math.floor(TAU*r/1.1)); for(let i=0;i<n;i++){ const a0=TAU*i/n, a1=TAU*(i+.62)/n; const mid=(a0+a1)/2; if(Math.abs(Math.atan2(Math.sin(mid-skipAng),Math.cos(mid-skipAng)))<.45) continue; const d=Math.min(.55,r*.3); const p=[cx+r*Math.cos(a0),cy+r*Math.sin(a0)], q=[cx+r*Math.cos(a1),cy+r*Math.sin(a1)]; tab(p,q,cx,cy,d); } };
+    if(state.shape==='cylinder'){ const W=u.W*S;
+      tab([W/2,-H/2],[W/2,H/2],0,0,.8);
+      parts.push(`<rect x="${f(-W/2)}" y="${f(-H/2)}" width="${f(W)}" height="${f(H)}" fill="#fff" ${cut}/>`); ext(-W/2,-H/2); ext(W/2,H/2);
+      [[0,H/2+r1,-PI/2],[0,-H/2-r1,PI/2]].forEach(([cx,cy,sk])=>{ teeth(cx,cy,r1,sk); parts.push(`<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r1)}" fill="#fff" ${cut}/>`); ext(cx-r1,cy-r1); ext(cx+r1,cy+r1); });
+    } else { const l=Math.hypot(h,R1-R2), L=(state.shape==='cone'?l:l*R1/(R1-R2))*S, Lin=state.shape==='cone'?0:L-l*S, Phi=u.angle*PI/180;
+      const pt=(rho,psi)=>[rho*Math.cos(PI/2+psi),rho*Math.sin(PI/2+psi)];
+      const a=pt(L,-Phi/2), b=pt(L,Phi/2), ai=pt(Lin,-Phi/2), bi=pt(Lin,Phi/2);
+      tab(bi,b,0,L*.6,.8);
+      const large=Phi>PI?1:0;
+      const d= Lin>0? `M${f(ai[0])},${f(ai[1])} L${f(a[0])},${f(a[1])} A${f(L)},${f(L)} 0 ${large} 1 ${f(b[0])},${f(b[1])} L${f(bi[0])},${f(bi[1])} A${f(Lin)},${f(Lin)} 0 ${large} 0 ${f(ai[0])},${f(ai[1])} Z`: `M0,0 L${f(a[0])},${f(a[1])} A${f(L)},${f(L)} 0 ${large} 1 ${f(b[0])},${f(b[1])} Z`;
+      parts.push(`<path d="${d}" fill="#fff" ${cut}/>`);
+      for(let i=0;i<=64;i++){ const p=pt(L,-Phi/2+Phi*i/64); ext(p[0],p[1]); const q=pt(Lin,-Phi/2+Phi*i/64); ext(q[0],q[1]); } ext(0,0);
+      teeth(0,L+r1,r1,-PI/2); parts.push(`<circle cx="0" cy="${f(L+r1)}" r="${f(r1)}" fill="#fff" ${cut}/>`); ext(-r1,L); ext(r1,L+2*r1);
+      if(Lin>0){ teeth(0,Lin-r2,r2,PI/2); parts.push(`<circle cx="0" cy="${f(Lin-r2)}" r="${f(r2)}" fill="#fff" ${cut}/>`); ext(-r2,Lin-2*r2); }
+    }
+  }
+  const m=.6; minX-=m; minY-=m+.7; maxX+=m; maxY+=m;
+  const w=maxX-minX, hh=maxY-minY;
+  const dims=SHAPES[state.shape].params.map(k=>`${paramDef(state.shape,k,P()).sym}=${fmt(P()[k])}`).join(', ');
+  parts.push(`<text x="${f(minX+.3)}" y="${f(minY+.45)}" font-size="0.32" fill="#333" font-family="sans-serif">${title} (${dims} ${t('cm')})${scale!==1?' · '+t('pScale')+' '+fmt(scale):''}</text>`);
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${f(w*10)}mm" height="${f(hh*10)}mm" viewBox="${f(minX)} ${f(minY)} ${f(w)} ${f(hh)}">${parts.join('')}</svg>`;
+  return {svg,w,h:hh};
+}
+const embedded=(()=>{ try{ return window.self!==window.top; }catch(e){ return true; } })();
+function openPrint(){
+  const modal=$('#modal'); const res=netSVG(printScale); if(!res) return;
+  const fits=(res.w<=19.2&&res.h<=27.9)||(res.w<=27.9&&res.h<=19.2);
+  modal.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-labelledby="pt"><header><h3 id="pt">${t('pTitle')} · ${t(state.shape)}</h3><button class="btn" id="pClose">${t('pClose')}</button></header>
+  <div class="body"><div class="svgbox">${res.svg}</div><p class="note">${t('pSize',fmt(res.w),fmt(res.h))} <b style="color:var(${fits?'--ok':'--err'})">${fits?t('pFits'):t('pNoFit')}</b></p><p class="note">${t('pLegend')}</p>
+  <label class="scale" for="pScaleIn">${t('pScale')} <input id="pScaleIn" type="number" min="0.2" max="3" step="0.1" value="${printScale}"></label>${embedded?`<p class="note">${t('pEmbedded')}</p>`:''}</div>
+  <footer>${embedded?'':`<button class="btn pri" id="pPrint">${t('pPrint')}</button><button class="btn" id="pDl">${t('pDownload')}</button>`}<button class="btn ${embedded?'pri':''}" id="pCopy">${t('pCopy')}</button></footer></div>`;
+  modal.hidden=false;
+  $('#pClose').onclick=()=>{ modal.hidden=true; };
+  modal.onclick=e=>{ if(e.target===modal) modal.hidden=true; };
+  $('#pScaleIn').onchange=e=>{ printScale=clamp(parseFloat(e.target.value)||1,.2,3); openPrint(); };
+  $('#pCopy').onclick=()=>{ const b=$('#pCopy'); const done=()=>{ b.textContent=t('pCopied'); setTimeout(()=>b.textContent=t('pCopy'),1600); };
+    const fb=()=>{ const ta=document.createElement('textarea'); ta.value=res.svg; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); done();}catch(e){} ta.remove(); };
+    try{ navigator.clipboard.writeText(res.svg).then(done,fb); }catch(e){ fb(); } };
+  if(!embedded){
+    $('#pPrint').onclick=()=>{ $('#printArea').innerHTML=res.svg; setTimeout(()=>window.print(),50); };
+    $('#pDl').onclick=()=>{ const blob=new Blob([res.svg],{type:'image/svg+xml'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`razvertka-${state.shape}.svg`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); };
+  }
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#modal').hidden=true; });
+
+/* ================= main loop ================= */
+let last=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  if(orbit.tween){ const tw=orbit.tween, k=ease(clamp((now-tw.start)/tw.ms,0,1)); orbit.theta=tw.from.theta+(tw.to.theta-tw.from.theta)*k; orbit.phi=tw.from.phi+(tw.to.phi-tw.from.phi)*k; orbit.dist=tw.from.dist+(tw.to.dist-tw.from.dist)*k; if(!state.anim) orbit.target.copy(tw.from.target).lerp(tw.to.target,k); if(k>=1) orbit.tween=null; dirty=true; }
+  else if(ptrs.size===0 && (Math.abs(orbit.vt)>1e-4||Math.abs(orbit.vp)>1e-4)){ orbit.theta+=orbit.vt; orbit.phi=clamp(orbit.phi+orbit.vp,.04,PI-.04); orbit.vt*=.92; orbit.vp*=.92; dirty=true; }
+  if(state.autorotate&&ptrs.size===0&&!orbit.tween){ orbit.theta+=dt*.45; dirty=true; }
+  if(state.anim){ const a=state.anim, k=clamp((now-a.start)/a.ms,0,1); setT(a.from+(a.to-a.from)*k); if(k>=1){ const cb=a.cb; state.anim=null; if(a.to===1) reveal(); syncFoldBar(); if(state.mode==='build'&&state.t<=0.001) buildButtons(); cb&&cb(); } dirty=true; }
+  if(dirty){ applyCam(); if(cur&&cur.type==='revModel'&&cur.update) cur.update(); renderer.render(scene,camera); updateLabels(); dirty=false; }
+}
+
+/* ================= Telegram Mini App ================= */
+if(/tgWebApp/.test(location.hash+location.search)||window.TelegramWebviewProxy){
+  const s=document.createElement('script'); s.src='https://telegram.org/js/telegram-web-app.js';
+  s.onload=()=>{ try{ const W=window.Telegram.WebApp; W.ready(); W.expand(); if(W.colorScheme==='dark') document.documentElement.setAttribute('data-theme','dark'); const lc=W.initDataUnsafe&&W.initDataUnsafe.user&&W.initDataUnsafe.user.language_code; if(lc==='kk'&&!ls.get('gran.lang')){ lang='kz'; renderAll(); rebuild(); } }catch(e){} };
+  document.head.appendChild(s);
+}
+
+/* ================= start ================= */
+const h0=location.hash.slice(1); if(['model','net','build'].includes(h0)) state.mode=h0;
+if(state.mode==='build') ensureBuild();
+resize(); rebuild(); renderAll(); frame(true);
+setTimeout(killHint,9000);
+requestAnimationFrame(loop);
+window.__gran={state,get cur(){return cur;},setMode,selectShape,playFold,setT,startQuiz,analyzeNet,buildPoly,treeBFS,treeDFS,treeRandom,treeWrong,openPrint};
+})();
+</script>
+
+</body>
+</html>
