@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Матрицы — интерактивный учебник</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="paper"></div>
+
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="index.html"><span class="badge">M</span> Матрицы</a>
+  <button class="burger">☰</button>
+  <div class="nav-links">
+    <a href="index.html" class="active">Главная</a>
+    <a href="matrix.html">Матрица</a>
+    <a href="operations.html">Действия</a>
+    <a href="determinant.html">Определители</a>
+    <a href="inverse.html">Обратная матрица</a>
+    <a href="systems.html">Системы уравнений</a>
+  </div>
+</div></nav>
+
+<!-- HERO -->
+<header class="page-hero" style="min-height:82vh;display:flex;flex-direction:column;justify-content:center">
+  <canvas id="heroCanvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:-1;opacity:.8"></canvas>
+  <div class="wrap">
+    <div class="eyebrow">Интерактивный учебник · линейная алгебра</div>
+    <h1>Матрицы</h1>
+    <p class="lead">От «что это за таблица чисел» — до обратных матриц и систем уравнений. С живыми калькуляторами, наглядной лабораторией и примерами из реальной жизни.</p>
+    <div style="margin-top:26px;display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn" href="matrix.html">Начать с основ →</a>
+      <a class="btn ghost" href="#lab">Открыть лабораторию</a>
+    </div>
+  </div>
+</header>
+
+<!-- COURSE -->
+<section>
+  <div class="wrap reveal">
+    <span class="tag">Программа</span>
+    <h2>Шесть тем по порядку</h2>
+    <p class="lead">Каждая тема — отдельная страница с объяснением и интерактивом. Идти лучше сверху вниз.</p>
+    <div class="topics">
+      <a class="topic" href="matrix.html"><div class="num">01</div><h3>Матрица</h3><p>Что это, размер, элементы, виды матриц.</p><span class="go">Изучить →</span></a>
+      <a class="topic" href="operations.html"><div class="num">02</div><h3>Действия над матрицами</h3><p>Сложение, умножение на число и друг на друга, транспонирование.</p><span class="go">Изучить →</span></a>
+      <a class="topic" href="determinant.html"><div class="num">03</div><h3>Определители</h3><p>Как считать для 2×2 и 3×3, свойства, геометрический смысл. + калькулятор.</p><span class="go">Изучить →</span></a>
+      <a class="topic" href="inverse.html"><div class="num">04</div><h3>Обратная матрица</h3><p>Что это, когда существует, два способа вычисления. + калькулятор.</p><span class="go">Изучить →</span></a>
+      <a class="topic" href="systems.html"><div class="num">05</div><h3>Системы уравнений</h3><p>Метод Крамера, матричный метод, метод Гаусса. + решатель.</p><span class="go">Изучить →</span></a>
+      <a class="topic" href="#lab"><div class="num">06</div><h3>Живая лаборатория</h3><p>Крути и растягивай пространство матрицей. Здесь всё «щёлкает».</p><span class="go">Открыть →</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- LAB -->
+<section id="lab">
+  <div class="wrap reveal">
+    <span class="tag">🔬 Живая лаборатория</span>
+    <h2>Матрица = преобразование пространства</h2>
+    <p class="lead">Матрица 2×2 говорит всей координатной сетке, куда переехать. Её столбцы — новые адреса опорных стрелок
+      <span style="color:var(--iHat)">î</span> (вправо) и <span style="color:var(--jHat)">ĵ</span> (вверх). Жми кнопки.</p>
+
+    <div class="calc-box">
+      <canvas id="labCanvas" width="900" height="520"></canvas>
+      <div class="controls">
+        <button class="ctrl" data-m="rotate">↻ Поворот</button>
+        <button class="ctrl" data-m="scale">⤢ Растяжение</button>
+        <button class="ctrl" data-m="shear">⇢ Сдвиг</button>
+        <button class="ctrl" data-m="reflect">🪞 Отражение</button>
+        <button class="ctrl" data-m="squish">▭ Сжатие (det=0)</button>
+        <button class="ctrl reset" data-m="reset">⟲ Сброс</button>
+      </div>
+      <div style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap">
+        <span style="color:var(--muted)">Матрица:</span>
+        <div class="matrix" style="grid-template-columns:repeat(2,1fr)">
+          <div class="cell col-i" id="m00" style="box-shadow:inset 0 0 0 2px var(--iHat)">1</div>
+          <div class="cell col-j" id="m01" style="box-shadow:inset 0 0 0 2px var(--jHat)">0</div>
+          <div class="cell col-i" id="m10" style="box-shadow:inset 0 0 0 2px var(--iHat)">0</div>
+          <div class="cell col-j" id="m11" style="box-shadow:inset 0 0 0 2px var(--jHat)">1</div>
+        </div>
+        <span class="mono gold">det = <span id="detVal">1</span></span>
+      </div>
+      <div class="lab-legend">
+        <span><i class="swatch" style="background:var(--iHat)"></i> î — первый столбец</span>
+        <span><i class="swatch" style="background:var(--jHat)"></i> ĵ — второй столбец</span>
+      </div>
+    </div>
+    <div class="callout g"><b>Читай так:</b> число в левом верхнем углу — насколько вправо уехала стрелка î, под ним — насколько вверх. Правый столбец — то же самое для ĵ. Из этих двух стрелок собирается вся картинка.</div>
+  </div>
+</section>
+
+<!-- IRL -->
+<section>
+  <div class="wrap reveal">
+    <span class="tag j">Реальный мир</span>
+    <h2>Где матрицы работают прямо сейчас</h2>
+    <p class="lead">Не абстракция из учебника. Вот конкретные места, где без матриц ничего бы не работало.</p>
+
+    <div class="apps">
+      <div class="app">
+        <div class="ico">🎮</div>
+        <h3>Видеоигры и 3D</h3>
+        <p>Каждый кадр видеокарта умножает координаты каждой вершины модели на матрицы поворота, масштаба и проекции 3D → экран.</p>
+        <p class="real">GTA V: ~миллионы вершин × 60 кадров/сек = сотни миллионов матричных умножений каждую секунду.</p>
+      </div>
+      <div class="app">
+        <div class="ico">🔎</div>
+        <h3>Поиск Google</h3>
+        <p>Алгоритм PageRank представляет весь интернет как гигантскую матрицу ссылок и находит её «главный вектор» — так страницы получают свой рейтинг.</p>
+        <p class="real">Матрица размером в миллиарды строк — по числу страниц в вебе.</p>
+      </div>
+      <div class="app">
+        <div class="ico">🧠</div>
+        <h3>ChatGPT и нейросети</h3>
+        <p>Каждый слой сети — это умножение вектора входа на матрицу «весов». Ответ модели — это цепочка из тысяч матричных умножений.</p>
+        <p class="real">В больших моделях матрицы весов содержат сотни миллиардов чисел.</p>
+      </div>
+      <div class="app">
+        <div class="ico">🩻</div>
+        <h3>Медицина: КТ и МРТ</h3>
+        <p>Томограф снимает тело «просветами» под разными углами, а картинку среза восстанавливает, решая огромную систему линейных уравнений.</p>
+        <p class="real">Именно поэтому темы «системы уравнений» и «обратная матрица» — не для галочки.</p>
+      </div>
+      <div class="app">
+        <div class="ico">📷</div>
+        <h3>Фото, фильтры, JPEG</h3>
+        <p>Картинка — это матрица пикселей. Поворот, размытие, резкость — операции над матрицей. Сжатие JPEG тоже основано на матричном преобразовании.</p>
+        <p class="real">Фото 12 Мп = матрица примерно 4000 × 3000 чисел на каждый цвет.</p>
+      </div>
+      <div class="app">
+        <div class="ico">🛰️</div>
+        <h3>GPS и навигация</h3>
+        <p>Телефон определяет позицию, решая систему уравнений по сигналам спутников, а фильтр Калмана (тоже матрицы) сглаживает движение на карте.</p>
+        <p class="real">Минимум 4 спутника → система из нескольких уравнений в реальном времени.</p>
+      </div>
+      <div class="app">
+        <div class="ico">🏗️</div>
+        <h3>Инженерия и мосты</h3>
+        <p>Расчёт нагрузок в конструкции — это система из тысяч уравнений, записанная как одно матричное. Метод конечных элементов держится на матрицах.</p>
+        <p class="real">Один расчёт моста — матрица на десятки тысяч неизвестных.</p>
+      </div>
+      <div class="app">
+        <div class="ico">🔐</div>
+        <h3>Шифрование</h3>
+        <p>Сообщение превращают в числа и умножают на секретную матрицу-ключ. Чтобы прочитать — нужна обратная матрица. Нет ключа — нет доступа.</p>
+        <p class="real">Классический шифр Хилла — прямое применение обратной матрицы.</p>
+      </div>
+    </div>
+
+    <div class="callout">Заметил закономерность? Почти во всех примерах всплывают три вещи: <b>умножение матриц</b>, <b>определитель</b> и <b>решение систем уравнений</b>. Именно их мы и разбираем в этом учебнике.</div>
+  </div>
+</section>
+
+<div class="prevnext wrap">
+  <a class="next" href="matrix.html" style="margin-left:auto"><div class="lbl">Следующая тема →</div><div class="ttl">01 · Что такое матрица</div></a>
+</div>
+
+<footer><div class="wrap">
+  <p style="font-family:'Unbounded';color:var(--text);font-size:20px">Матрицы — язык, на котором компьютеры двигают миры.</p>
+  <div class="foot-links">
+    <a href="matrix.html">Матрица</a><a href="operations.html">Действия</a><a href="determinant.html">Определители</a>
+    <a href="inverse.html">Обратная</a><a href="systems.html">Системы</a>
+  </div>
+</div></footer>
+
+<script src="common.js"></script>
+<script src="lab.js"></script>
+<script>
+/* hero animated grid */
+const hc=document.getElementById('heroCanvas'),hx=hc.getContext('2d');
+function hfit(){hc.width=hc.clientWidth;hc.height=hc.clientHeight;}
+hfit();addEventListener('resize',hfit);let ph=0;
+function heroDraw(){
+  hfit();const W=hc.width,H=hc.height;hx.clearRect(0,0,W,H);
+  const cx=W*0.74,cy=H*0.5,u=Math.min(W,H)/13;ph+=RED?0:0.006;
+  const c=Math.cos(ph*.6),s=Math.sin(ph*.6),sc=1+.35*Math.sin(ph);
+  const M=[[c*sc,-s],[s,c*sc]];
+  const tp=(x,y)=>[cx+(M[0][0]*x+M[0][1]*y)*u,cy-(M[1][0]*x+M[1][1]*y)*u];
+  const R=8;hx.lineWidth=1;hx.strokeStyle='rgba(53,230,200,.15)';
+  for(let i=-R;i<=R;i++){hx.beginPath();let p=tp(i,-R);hx.moveTo(p[0],p[1]);p=tp(i,R);hx.lineTo(p[0],p[1]);hx.stroke();
+    hx.beginPath();p=tp(-R,i);hx.moveTo(p[0],p[1]);p=tp(R,i);hx.lineTo(p[0],p[1]);hx.stroke();}
+  if(!RED)requestAnimationFrame(heroDraw);
+}
+heroDraw();
+initLab();
+</script>
+</body>
+</html>
